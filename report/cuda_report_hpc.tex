@@ -105,6 +105,35 @@ Parallelize this parallelize that.
 
 \section{Stochastic Gradient Descent}
 
+
+One of the most common problems in machine learning, estimation and optimization theory is the one of minimizing an objective function \citep{bottou2010large}. Consider the \textit{loss} function $Q(z, w)$. This function depends both of the sample $z=(x, y)$ which is a pair of input $x$ and output $y$ and on the vector $w$ which parametrizes the function that connects the input to the output. In such a context we will like to find the vector $w$ that minimizes this error averaged over the sample. Or in a more mathematical parlance the following statement:
+
+\begin{equation}
+E(w) = \frac{1}{n} \sum_{i=1}^n Q(z_i, w)
+\end{equation}
+
+Where the index $i$ goes through all the samples $z$. 
+
+The general method of Gradient Descent proposes moving in the direction of the gradient in order to find $w$. 
+
+\begin{equation}
+w_{t + 1} = w_t - \gamma \sum_{i=1}^n \triangledown_w Q(z_i, w)
+\end{equation}
+
+Where $gamma$ is called the usually called the learning rate and controls the speed of convergence (or divergence if it is too big). 
+
+Under sufficient regularity assumptions when the initial estimate of $w$ is close enough to the minimum and the learning rate is small enough this algorithm can achieve linear convergence \citep{dennis1996numerical}. 
+
+Stochastic Gradient Descent is a simplification of the scheme proposed above. In this case the average over the sample space is put aside and instead we use the local gradient to indicate the proper direction of movement:
+
+\begin{equation}
+w_{t + 1} = w_t - \gamma  \triangledown_w Q(z_i, w)
+\end{equation} 
+
+It follows from the algorithm that this optimazation can be implemented online due to the fact that not memory is needed no the calculation. The convergence of stochastic gradient descent is granted in some mild conditions when the learning rate $gamma$ decreases over time in such a way that the series indexed by them does not diverge \citep{bottou2010large}. 
+
+It is the general wisdom that when the learning samples form a big set (big data) Stochastic Gradient Descent can achieve a better performance that its normal version. There is research, however, that points out the domain of application of this method is greater and overall surpasses Gradient Descent in most of domains \citep{wilson2003general}. 
+
 \bibliographystyle{plainnat}
 \bibliography{references}
 \end{document}
