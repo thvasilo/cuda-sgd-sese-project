@@ -1,0 +1,110 @@
+%\RequirePackage[l2tabu, orthodox]{nag}  %Checks for older packages 
+
+\documentclass[11pt,a4paper]{article}
+% \documentclass[10pt]{extreport} $ allos to make the font smaller
+\usepackage[utf8]{inputenc}
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{indentfirst}
+\usepackage{amssymb}
+\usepackage{siunitx}  % Units of the metric system  \SI{2.63}{\ohm}   
+\usepackage[font={footnotesize}]{caption} %Makes the captions small
+
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+%% Figures packages
+\usepackage[pdftex]{graphicx}
+\usepackage{float}   %Es para colocar el objeto flotante exactamente donde se ponga el comando con H
+\usepackage{caption}
+\usepackage{subcaption}
+\graphicspath{{../results/}}
+\usepackage{sidecap}  %Para poner figuras a los lados
+
+
+\usepackage{setspace} % Needed for Pyton syntax highlight
+\usepackage{listings}    % Include the listings-package, nice verbatim for code
+\usepackage{color}
+\usepackage{courier}
+
+
+\usepackage{cleveref} %puts figure and equation appropiately \cref{} 
+
+\usepackage{natbib} %For bibliography
+%\usepackage{cite}
+\usepackage{framed} % To use boxes, or frames around text
+
+\usepackage{parskip} %Para saltos entre parrafos
+\setlength{\parindent}{0pt} 
+\setlength{\parskip}{\baselineskip}
+\usepackage[a4paper,margin=0.8in]{geometry}  %%Cambiar los margenes
+
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+
+%\usepackage{hyperref} %This should be loade after most of the other packages 
+% \hypersetup{colorlinks=true}  %Para que los hiperlinks cuando se hagan referencias aparezcan en colores.
+
+
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+
+\title{Lab12: DD2380 }
+\author{
+Ramon Heberto Martinez Mayorquin  hramon@kth.se 
+Akash Kumar Dhaka  akashd@kth.se 
+}
+
+
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+%\includegraphics[width=0.15\textwidth]{logo}\\[1cm]    
+
+\textsc{\LARGE Kungliga Tekniska högskolan}\\[1.0cm]
+
+\textsc{\Large Summer School: Introduction to High Performance Computing}\\[2.0cm]
+
+
+
+\begin{figure}[H]
+	\centering
+ \includegraphics[width=0.35\textwidth]{Kth_logo.png}
+\end{figure}
+%\\[1cm]    
+%
+
+% Title
+\HRule \\[0.4cm]
+{ \huge  Project: Stochastic Gradient Descent in CUDA.
+}\\[0.4cm]
+\HRule \\[1.5cm]
+
+% Author and supervisor
+
+Authors: Ram\'on  Mart\'inez, Theodore Vasiloudis   \\ 
+\large Professors: One Dude, The other dude.  \\ [2.5cm]
+%\normalsize Presenta \\
+%\large Supervisors 2: Jan Antolik \\[2.5cm]
+
+\textsc{\Large School of Computer Science and Communication \\
+PDC Center for High Performance Computing}\\ [1.0cm] 
+\includegraphics[width=0.15\textwidth]{KTH_black.png}\\[1.5cm] % Controls the distance till the new object 
+% Bottom of the page
+{\large 15 September of 2015}
+
+\end{center}
+\end{titlepage}
+
+\begin{abstract}
+Parallelize this parallelize that.
+
+\end{abstract}
+
+\section{Stochastic Gradient Descent}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
