@@ -12,6 +12,29 @@ float batch_error(float *y_predic, float *y, int start, int end);
 float gradient_error(float *y_predic, float *y, float *x, int start, int end, bool constant);
 void evaluate_batch(float *y, float *x, int start, int end, float w0, float w1);
 
+void do_batch(int i, float *x, float *y, float *y_predic, 
+	      float *w0_est, float *w1_est, float gamma, int batch_size, bool verbose){
+    
+    // Get the bounds of the batch
+    int start = i * batch_size;
+    int end = (i + 1) * batch_size;
+   
+    // Get errors and estimate
+    evaluate_batch(y_predic, x, start, end, *(w0_est), *(w1_est));
+    float error0 = gradient_error(y_predic, y, x, start, end, true);
+    float error1 = gradient_error(y_predic, y , x, start, end, false);
+    *(w0_est) -= gamma * error0;
+    *(w1_est) -= gamma * error1;
+
+    if(verbose){
+      printf("The start and end are %d %d \n", start, end);
+      printf("The calculated errors are %f %f \n", error0, error1);
+      printf("The estimated values for w are %f %f \n", *(w0_est), *(w1_est));
+    }
+}
+
+
+
 //////////////
 // Main
 //////////////
@@ -28,8 +51,8 @@ int main(){
   int Nexamples = 1000;
   int Nbatch = 10;
   int batch_size = Nexamples / Nbatch;
-  float w0 = 1;
-  float w1 = 0;
+  float w0 = 3;
+  float w1 = 1;
 
   // Now the examples set
   float x[Nexamples];
@@ -46,29 +69,12 @@ int main(){
   // Now the algorithm
   int Niterations = 10000;
   float gamma = 0.1;
-  float error0, error1;
-  int start;
-  int end; 
   float w0_est = 0.5;
   float w1_est = 0.5;
     
   for(j=0; j<Niterations; j++){
     for(i=0; i<Nbatch; i++){
-      // Get the bounds of the batch
-      start = i * batch_size;
-      end = (i + 1) * batch_size;
-      // Get errors and estimate
-      evaluate_batch(y_predic, x, start, end, w0_est, w1_est);
-      error0 = gradient_error(y_predic, y, x, start, end, true);
-      error1 = gradient_error(y_predic, y , x, start, end, false);
-      w0_est -= gamma * error0;
-      w1_est -= gamma * error1;
-      // Print messages if verbose
-      if(verbose){
-	printf("The start and end are %d %d \n", start, end);
-	printf("The calculated errors are %f %f \n", error0, error1);
-	printf("The estimated values for w are %f %f \n", w0_est, w1_est);
-      }
+      do_batch(i, x, y, y_predic, &w0_est, &w1_est, gamma, batch_size, verbose);
     }
     if(verbose){
       printf("------------ \n");
@@ -80,7 +86,7 @@ int main(){
   printf("The estimated values for w are %f %f \n", w0_est, w1_est);
 
     
-  // print this
+  // print data and the estimation
   if(print){
     print_vector(y, Nexamples);
     print_vector(x, Nexamples);
@@ -152,3 +158,5 @@ float gradient_error(float *y_predic, float *y, float *x, int start, int end, bo
   error = error / size;
   return error;
 }
+
+
