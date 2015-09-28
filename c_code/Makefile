@@ -2,7 +2,7 @@ INC	:= -I$(CUDA_HOME)/include -I.
 LIB	:= -L$(CUDA_HOME)/lib64 #-lcudart
 
 # NVCCFLAGS	:= -lineinfo -arch=sm_20 #--ptxas-options=-v --use_fast_math
-NVCCFLAGS	:= -lineinfo -arch=sm_50 --std=c++11 #--ptxas-options=-v --use_fast_math
+NVCCFLAGS	:= -lineinfo -arch=sm_50 --std=c++11 #-g -G --ptxas-options=-v --use_fast_math
 
 CFLAGS := -Wall -g
 CXXFLAGS := -Wall -g
@@ -25,9 +25,21 @@ sgd_cuda: cuda_gradient_descent.cu Makefile
 	
 #sum_rows: sum_rows.cu Makefile
 #	nvcc sum_rows.cu -o sum_rows $(NVCCFLAGS) $(INC) $(LIB)
+
+#thrust_vector_transform: thrust_vector_transform.cu Makefile
+#	nvcc thrust_vector_transform.cu -o thrust_vector_transform.o $(NVCCFLAGS) $(INC) $(LIB)
+#	
+#zip: zip.cu Makefile
+#	nvcc zip.cu -o zip.o $(NVCCFLAGS) $(INC) $(LIB)
 	
 read_csv: read_csv.cc Makefile
 	$(CXX) read_csv.cc -o read_csv.o $(CXXFLAGS)
+
+stride: stride.cu Makefile
+	nvcc stride.cu -o stride.o $(NVCCFLAGS) $(INC) $(LIB)
+
+cuda_sgd: cuda_sgd.cu Makefile
+	nvcc cuda_sgd.cu -o cuda_sgd.o $(NVCCFLAGS) $(INC) $(LIB)
 
 clean:
 	rm -f serial_batch.o serial_online.o sgd_cuda.o read_csv.o
