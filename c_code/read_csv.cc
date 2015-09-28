@@ -24,7 +24,7 @@ std::vector<std::string> split_into_tokens(std::string line)
 
 /* Read a csv file into a vector of string vectors.
  * Each item of the container vector is a vector of strings, with
- * each item in that vector being a token in .
+ * each item in that vector being a token in a line in the csv file.
  */
 std::vector<StringVector> read_csv(std::string filename)
 {
