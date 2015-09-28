@@ -46,7 +46,7 @@ void kernel(float *x, float *y, float w0_est, float w1_est,
 
 
 int main(){
-    // System parametefunrs
+    // System parameters
     int i;
     int j;
     bool print = false;
@@ -85,7 +85,7 @@ int main(){
 
     // We get x
     for(i=0; i<Ndata; i++){
-	x[i] = (float) rand() / (RAND_MAX);
+    	x[i] = (float) rand() / (RAND_MAX);
     }
     // We get y
     evaluate_batch(y, x, 0, Ndata, w0, w1);
@@ -108,27 +108,27 @@ int main(){
     float error1;
 
     for(i=0; i<Niterations; i++){
-	// Calculate the errors
-	kernel<<<dimGrid, dimBlock>>>(x_device, y_device, w0_est, w1_est,
-				      gamma, grad0_device, grad1_device, batch_size);
-	// Copy the errors to the host
-	cudaMemcpy(grad0, grad0_device, grad_size, cudaMemcpyDeviceToHost);
-	cudaMemcpy(grad1, grad1_device, grad_size, cudaMemcpyDeviceToHost);
-	// print_vector(grad0, Ndata);
+		// Calculate the errors
+		kernel<<<dimGrid, dimBlock>>>(x_device, y_device, w0_est, w1_est,
+						  gamma, grad0_device, grad1_device, batch_size);
+		// Copy the errors to the host
+		cudaMemcpy(grad0, grad0_device, grad_size, cudaMemcpyDeviceToHost);
+		cudaMemcpy(grad1, grad1_device, grad_size, cudaMemcpyDeviceToHost);
+		// print_vector(grad0, Ndata);
+	
+		// Add the errors
+		error0 = 0;
+		error1 = 0;
 
-	// Add the errors
-	error0 = 0;
-	error1 = 0;
-	
-	for(j=1; j < Ndata; j++){
-	    error0 += grad0[j];
-	    error1 += grad1[j];
-	    }
-	
-	// Updates
-	w0_est -= gamma * error0 / Ndata;
-	w1_est -= gamma * error1 / Ndata;
-	// printf("The estimated values for w are %f %f \n", w0_est, w1_est);
+		for(j=1; j < Ndata; j++){
+			error0 += grad0[j];
+			error1 += grad1[j];
+			}
+
+		// Updates
+		w0_est -= gamma * error0 / Ndata;
+		w1_est -= gamma * error1 / Ndata;
+		// printf("The estimated values for w are %f %f \n", w0_est, w1_est);
 
     }
 
@@ -144,9 +144,9 @@ int main(){
 
     // print data and the estimation
     if(print){
-	print_vector(y, Ndata);
-	print_vector(x, Ndata);
-	print_vector(y_predic, Ndata);
+		print_vector(y, Ndata);
+		print_vector(x, Ndata);
+		print_vector(y_predic, Ndata);
     }
 
   return 0;
