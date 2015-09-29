@@ -34,6 +34,14 @@ struct linear_index_to_row_index : public thrust::unary_function<T,T>
   }
 };
 
+__device__ void print_device_vector(const float * vector, const int size, const char* name) {
+	printf("%s", name);
+	for (int i = 0; i < size; ++i) {
+		printf("%s ", vector[i]);
+	}
+	printf(" ]\n");
+}
+
 __global__ void calculate_gradients(const float * data_array_d, const int * label_vector_d, const float * weights_d, float * gradients_d, const int R, const int C) {
 	// TODO: R, C should be device constants
 	// Each data point should get one thread
@@ -45,14 +53,20 @@ __global__ void calculate_gradients(const float * data_array_d, const int * labe
 
 	// TODO: Vector operations should be done with cuBLAS using dynamic parallelism
 	if (thread_index < R) {
-		printf("example_index: %d\n", example_index);
+//		printf("example_index: %d\n", example_index);
 		// Calculate prediction
 		float prediction = 0.0;
 		// TODO: Guard against accesses that go outside the data_array_d limits
 		for (int i = 0; i < C; ++i) {
 			prediction += data_array_d[example_index + i] * weights_d[i];
 		}
-		float loss_derivative = label_vector_d[example_index] - prediction;
+		if (thread_index <= 1) {
+			printf("prediction in %d: %f\n", thread_index, prediction);
+		}
+		float loss_derivative = prediction - label_vector_d[thread_index];
+		if (thread_index <= 1) {
+			printf("loss_deriv in %d: %f\n", thread_index, loss_derivative);
+		}
 		//	float squared_loss = loss_derivative * loss_derivative;
 
 		// Scale the prediction gradient by the loss_derivative
@@ -63,7 +77,7 @@ __global__ void calculate_gradients(const float * data_array_d, const int * labe
 	}
 }
 
-__host__ void calculate_row_sums(int R, int C, thrust_dev_float& array, thrust_dev_float& row_sums, thrust_dev_int& row_indices) {
+__host__ void calculate_row_sums(const int R, const int C, const thrust_dev_float& array, thrust_dev_float& row_sums, thrust_dev_int& row_indices) {
 	// compute row sums by summing values with equal row indices
 	thrust::reduce_by_key(
 		thrust::make_transform_iterator(thrust::counting_iterator<int>(0), linear_index_to_row_index<int>(C)),
@@ -75,13 +89,24 @@ __host__ void calculate_row_sums(int R, int C, thrust_dev_float& array, thrust_d
 		thrust::plus<float>());
 }
 
-__host__ void print_vector(thrust_dev_float rowvector, std::string name) {
+__host__ void print_vector(const thrust_dev_float rowvector, const std::string name) {
 	std::cout << name << " = [ ";
 	for(auto element : rowvector)
 	{
 		std::cout << element << " ";
 	}
 	std::cout << "]" << std::endl;
+}
+
+__host__ void print_matrix(const thrust_dev_float matrix, const std::string name, const int R, const int C) {
+	std::cout << name << std::endl;
+	for(int i = 0; i < R; i++)
+	{
+		std::cout << "[ ";
+		for(int j = 0; j < C; j++)
+		  std::cout << matrix[i * C + j] << " ";
+		std::cout << "]" << std::endl;
+	}
 }
 
 // TODO: Combine all iteration steps into one function
@@ -104,7 +129,7 @@ int main(int argc, char **argv) {
 	int C = 8;     // number of columns
 	thrust::default_random_engine rng;
 	thrust::uniform_real_distribution<float> dist(10, 99);
-	thrust::uniform_real_distribution<float> weight_dist(0.0, 1.0);
+	thrust::uniform_real_distribution<float> weight_dist(0.0, 0.01);
 	thrust::uniform_int_distribution<int> label_dist(0, 1);
 
 	// Initialize data
@@ -134,11 +159,12 @@ int main(int argc, char **argv) {
 	thrust_dev_float gradients(R * C);
 	// note: d_vec.data() returns a device_ptr
 	float * gradients_raw_ptr = thrust::raw_pointer_cast(gradients.data());
-	thrust::fill(gradients.begin(), gradients.end(), 0.0);
 
 	// allocate storage for row sums and indices
 	thrust_dev_float row_sums(R);
 	thrust_dev_int row_indices(R);
+
+	print_matrix(array, "data", R, C);
 
 	for (int iteration = 1; iteration <= MAX_ITERATIONS; ++iteration) {
 		thrust::fill(gradients.begin(), gradients.end(), 0.0);
@@ -153,8 +179,8 @@ int main(int argc, char **argv) {
 
 		// Sum/reduce the gradient vectors
 		thrust::fill(row_sums.begin(), row_sums.end(), 0.0);
+		thrust::fill(row_indices.begin(), row_indices.end(), 0.0);
 		calculate_row_sums(R, C, gradients, row_sums, row_indices);
-		//TODO: Do I need to reset the sums to 0?
 		// Can we re-use the iterators?
 		// Scale gradient vector
 		thrust::for_each(gradients.begin(), gradients.end(), _1 / (float)R);
@@ -169,7 +195,7 @@ int main(int argc, char **argv) {
 		                      a * _1 + _2);        // placeholder expression
 
 		print_vector(weights, "weights");
-		print_vector(gradients, "weight_gradient");
+		print_matrix(gradients, "weight_gradients", R, C);
 	}
 
 
