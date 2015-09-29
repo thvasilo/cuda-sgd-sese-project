@@ -60,16 +60,17 @@ __global__ void calculate_gradients(const float * data_array_d, const int * labe
 		for (int i = 0; i < C; ++i) {
 			prediction += data_array_d[example_index + i] * weights_d[i];
 		}
-		if (thread_index <= 1) {
+//		if (thread_index <= 1) {
 			printf("prediction in %d: %f\n", thread_index, prediction);
-		}
+//		}
+		// For squared loss the loss derivative is equal to the simple loss: (y_hat - y_true)
 		float loss_derivative = prediction - label_vector_d[thread_index];
-		if (thread_index <= 1) {
+//		if (thread_index <= 1) {
 			printf("loss_deriv in %d: %f\n", thread_index, loss_derivative);
-		}
+//		}
 		//	float squared_loss = loss_derivative * loss_derivative;
 
-		// Scale the prediction gradient by the loss_derivative
+		// Scale the gradient by the loss_derivative
 		for (int i = 0; i < C; ++i) {
 			// For linear models the gradient equals the features
 			gradients_d[example_index + i] = loss_derivative * data_array_d[example_index + i];
@@ -89,7 +90,8 @@ __host__ void calculate_row_sums(const int R, const int C, const thrust_dev_floa
 		thrust::plus<float>());
 }
 
-__host__ void print_vector(const thrust_dev_float rowvector, const std::string name) {
+template<typename T>
+__host__ void print_vector(const T rowvector, const std::string name) {
 	std::cout << name << " = [ ";
 	for(auto element : rowvector)
 	{
@@ -112,18 +114,21 @@ __host__ void print_matrix(const thrust_dev_float matrix, const std::string name
 // TODO: Combine all iteration steps into one function
 //__host__ void SGDStep(int R, int C, float * data_array_d, )
 
-
+// Usage: run without arguments, or with both initial learning rate and number of iterations.
+// e.g.: > ./sgd_thrust.o 0.0001 20
 int main(int argc, char **argv) {
 
 	float learning_rate;
+	int MAX_ITERATIONS;
 	if (argc == 1) {
 		learning_rate = 0.001;
+		MAX_ITERATIONS = 10;
 	} else {
 		learning_rate = atof(argv[1]);
+		MAX_ITERATIONS = atoi(argv[2]);
 	}
 	std::cout << "lr: " << learning_rate << std::endl;
 
-	const int MAX_ITERATIONS = 10;
 	const int THREADS_PER_BLOCK = 256;
 	int R = 5;     // number of rows
 	int C = 8;     // number of columns
@@ -165,9 +170,12 @@ int main(int argc, char **argv) {
 	thrust_dev_int row_indices(R);
 
 	print_matrix(array, "data", R, C);
+	print_vector<thrust_dev_int>(labels, "labels");
 
 	for (int iteration = 1; iteration <= MAX_ITERATIONS; ++iteration) {
+		// Reset gradients
 		thrust::fill(gradients.begin(), gradients.end(), 0.0);
+
 		//Calculate the gradient vector for each datapoint
 		calculate_gradients<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
 				data_raw_ptr,
@@ -181,20 +189,20 @@ int main(int argc, char **argv) {
 		thrust::fill(row_sums.begin(), row_sums.end(), 0.0);
 		thrust::fill(row_indices.begin(), row_indices.end(), 0.0);
 		calculate_row_sums(R, C, gradients, row_sums, row_indices);
-		// Can we re-use the iterators?
-		// Scale gradient vector
-		thrust::for_each(gradients.begin(), gradients.end(), _1 / (float)R);
+
+		// Scale gradient sum vector
+		thrust::for_each(row_sums.begin(), row_sums.end(), _1 / (float)R);
 
 		//Update the weight vector
 		float a = -(learning_rate / std::sqrt(iteration));
 		std::cout << "a: " << a << std::endl;
 		// Thrust SAXPY
-		thrust::transform(gradients.begin(), gradients.end(),  // input range #1
+		thrust::transform(row_sums.begin(), row_sums.end(),  // input range #1
 		                      weights.begin(),           // input range #2
 		                      weights.begin(),           // output range
 		                      a * _1 + _2);        // placeholder expression
 
-		print_vector(weights, "weights");
+		print_vector<thrust_dev_float>(weights, "weights");
 		print_matrix(gradients, "weight_gradients", R, C);
 	}
 
