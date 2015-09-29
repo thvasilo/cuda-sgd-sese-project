@@ -40,10 +40,11 @@ __global__ void calculate_gradients(const float * data_array_d, const int * labe
 	// TODO: Verify that the accesses are correct, I think we modify the same elements
 	// in the gradients matrix in different threads right now, which shouldn't happen.
 	// We want each thread to take one "row" of the matrix and only modify that.
-	int example_index = blockIdx.x * blockDim.x + threadIdx.x;
+	int thread_index = blockIdx.x * blockDim.x + threadIdx.x;
+	int example_index = thread_index * C;
 
 	// TODO: Vector operations should be done with cuBLAS using dynamic parallelism
-	if (example_index < R) {
+	if (thread_index < R) {
 		printf("example_index: %d\n", example_index);
 		// Calculate prediction
 		float prediction = 0.0;
