@@ -34,9 +34,9 @@ struct linear_index_to_row_index : public thrust::unary_function<T,T>
   }
 };
 
-__global__ void calculate_gradients(float * data_array_d, int * label_vector_d, float * weights_d, float * gradients_d, int dimensions) {
+__global__ void calculate_gradients(const float * data_array_d, const int * label_vector_d, const float * weights_d, float * gradients_d, const int dimensions) {
 	// Each data point should get one thread
-	int example_index = blockIdx.x *blockDim.x + threadIdx.x;
+	int example_index = blockIdx.x * blockDim.x + threadIdx.x;
 
 	// TODO: Vector operations should be done with cuBLAS using dynamic parallelism
 
@@ -83,13 +83,21 @@ __host__ void print_vector(thrust_dev_float rowvector, std::string name) {
 
 int main(int argc, char **argv) {
 
-	const float learning_rate = argv[0];
+	float learning_rate;
+	if (argc == 1) {
+		learning_rate = 0.001;
+	} else {
+		learning_rate = atof(argv[1]);
+	}
+	std::cout << "lr: " << learning_rate << std::endl;
+
 	const int MAX_ITERATIONS = 10;
 	const int THREADS_PER_BLOCK = 256;
 	int R = 5;     // number of rows
 	int C = 8;     // number of columns
 	thrust::default_random_engine rng;
 	thrust::uniform_real_distribution<float> dist(10, 99);
+	thrust::uniform_real_distribution<float> weight_dist(0.0, 1.0);
 	thrust::uniform_int_distribution<int> label_dist(0, 1);
 
 	// Initialize data
@@ -111,7 +119,9 @@ int main(int argc, char **argv) {
 	thrust_dev_float weights(C);
 	// note: d_vec.data() returns a device_ptr
 	float * weights_raw_ptr = thrust::raw_pointer_cast(weights.data());
-	thrust::fill(weights.begin(), weights.end(), 0.0);
+	for (size_t i = 0; i < weights.size(); i++) {
+				weights[i] = weight_dist(rng);
+	}
 
 	// Initialize gradients
 	thrust_dev_float gradients(R * C);
@@ -124,6 +134,7 @@ int main(int argc, char **argv) {
 	thrust_dev_int row_indices(R);
 
 	for (int iteration = 1; iteration <= MAX_ITERATIONS; ++iteration) {
+		thrust::fill(gradients.begin(), gradients.end(), 0.0);
 		//Calculate the gradient vector for each datapoint
 		calculate_gradients<<<iDivUp(R*C, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
 				data_raw_ptr,
@@ -133,7 +144,8 @@ int main(int argc, char **argv) {
 				C);
 
 		// Sum/reduce the gradient vectors
-		calculate_row_sums(R, C, array, row_sums, row_indices);
+		thrust::fill(row_sums.begin(), row_sums.end(), 0.0);
+		calculate_row_sums(R, C, gradients, row_sums, row_indices);
 		//TODO: Do I need to reset the sums to 0?
 		// Can we re-use the iterators?
 		// Scale gradient vector
@@ -141,6 +153,7 @@ int main(int argc, char **argv) {
 
 		//Update the weight vector
 		float a = -(learning_rate / std::sqrt(iteration));
+		std::cout << "a: " << a << std::endl;
 		// Thrust SAXPY
 		thrust::transform(gradients.begin(), gradients.end(),  // input range #1
 		                      weights.begin(),           // input range #2
