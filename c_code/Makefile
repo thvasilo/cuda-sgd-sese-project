@@ -8,37 +8,37 @@ CFLAGS := -Wall -g
 CXXFLAGS := -Wall -g
 CXX := g++ --std=c++11
 
-all: #serial_batch serial_online sgd_cuda read_csv #thurst_simple sum_rows
+all: sgd_thrust.o#serial_batch serial_online sgd_cuda read_csv #thurst_simple sum_rows
 
-serial_batch: serial_code_batch.c Makefile
+serial_batch.o: serial_code_batch.c Makefile
 	cc serial_code_batch.c -o serial_batch.o $(CFLAGS)
 	
-serial_online: serial_code_online.c Makefile
+serial_online.o: serial_code_online.c Makefile
 	cc serial_code_online.c -o serial_online.o $(CFLAGS)
 	
-sgd_cuda: cuda_gradient_descent.cu Makefile
+sgd_cuda.o: cuda_gradient_descent.cu Makefile
 	nvcc cuda_gradient_descent.cu -o sgd_cuda.o $(NVCCFLAGS) $(INC) $(LIB)
 
 # Thrust examples
-#thurst_simple: basic_vector_thrust.cu Makefile
+#thurst_simple.o: basic_vector_thrust.cu Makefile
 #	nvcc basic_vector_thrust.cu -o thrust_simple $(NVCCFLAGS) $(INC) $(LIB)
 #	
-#sum_rows: sum_rows.cu Makefile
+#sum_rows.o: sum_rows.cu Makefile
 #	nvcc sum_rows.cu -o sum_rows $(NVCCFLAGS) $(INC) $(LIB)
 #
-#thrust_vector_transform: thrust_vector_transform.cu Makefile
+#thrust_vector_transform.o: thrust_vector_transform.cu Makefile
 #	nvcc thrust_vector_transform.cu -o thrust_vector_transform.o $(NVCCFLAGS) $(INC) $(LIB)
 #	
-#zip: zip.cu Makefile
+#zip.o: zip.cu Makefile
 #	nvcc zip.cu -o zip.o $(NVCCFLAGS) $(INC) $(LIB)
 #
-#stride: stride.cu Makefile
+#stride.o: stride.cu Makefile
 #	nvcc stride.cu -o stride.o $(NVCCFLAGS) $(INC) $(LIB)
 
-read_csv: read_csv.cc Makefile
+read_csv.o: read_csv.cc Makefile
 	$(CXX) read_csv.cc -o read_csv.o $(CXXFLAGS)
 
-sgd_thrust: sgd_thrust.cu Makefile
+sgd_thrust.o: sgd_thrust.cu Makefile
 	nvcc sgd_thrust.cu -o sgd_thrust.o $(NVCCFLAGS) $(INC) $(LIB)
 
 clean:
