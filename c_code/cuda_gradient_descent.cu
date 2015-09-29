@@ -104,6 +104,9 @@ int main(){
     dim3 dimGrid(Nbatch, 1, 1);
     dim3 dimBlock(batch_size, 1, 1);
 
+    printf("Number of blocks = %d", Nbatch);
+    printf("Number of threads per block = %d", batch_size);
+
     float error0;
     float error1;
 

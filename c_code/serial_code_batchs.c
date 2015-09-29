@@ -11,29 +11,8 @@ float linear_model(float x, float w0, float w1);
 float batch_error(float *y_predic, float *y, int start, int end);
 float gradient_error(float *y_predic, float *y, float *x, int start, int end, bool constant);
 void evaluate_batch(float *y, float *x, int start, int end, float w0, float w1);
-
 void do_batch(int i, float *x, float *y, float *y_predic, 
-	      float *w0_est, float *w1_est, float gamma, int batch_size, bool verbose){
-    
-    // Get the bounds of the batch
-    int start = i * batch_size;
-    int end = (i + 1) * batch_size;
-   
-    // Get errors and estimate
-    evaluate_batch(y_predic, x, start, end, *(w0_est), *(w1_est));
-    float error0 = gradient_error(y_predic, y, x, start, end, true);
-    float error1 = gradient_error(y_predic, y , x, start, end, false);
-    *(w0_est) -= gamma * error0;
-    *(w1_est) -= gamma * error1;
-
-    if(verbose){
-      printf("The start and end are %d %d \n", start, end);
-      printf("The calculated errors are %f %f \n", error0, error1);
-      printf("The estimated values for w are %f %f \n", *(w0_est), *(w1_est));
-    }
-}
-
-
+	      float *w0_est, float *w1_est, float gamma, int batch_size, bool verbose);
 
 //////////////
 // Main
@@ -153,10 +132,31 @@ float gradient_error(float *y_predic, float *y, float *x, int start, int end, bo
       error += (y_predic[i] - y[i]) * x[i];
     }
   }
-  
+   
   float size = (float) (end - start + 1);
   error = error / size;
   return error;
+}
+
+void do_batch(int i, float *x, float *y, float *y_predic, 
+	      float *w0_est, float *w1_est, float gamma, int batch_size, bool verbose){
+    
+    // Get the bounds of the batch
+    int start = i * batch_size;
+    int end = (i + 1) * batch_size;
+   
+    // Get errors and estimate
+    evaluate_batch(y_predic, x, start, end, *(w0_est), *(w1_est));
+    float error0 = gradient_error(y_predic, y, x, start, end, true);
+    float error1 = gradient_error(y_predic, y , x, start, end, false);
+    *(w0_est) -= gamma * error0;
+    *(w1_est) -= gamma * error1;
+
+    if(verbose){
+      printf("The start and end are %d %d \n", start, end);
+      printf("The calculated errors are %f %f \n", error0, error1);
+      printf("The estimated values for w are %f %f \n", *(w0_est), *(w1_est));
+    }
 }
 
 
