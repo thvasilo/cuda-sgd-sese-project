@@ -34,25 +34,31 @@ struct linear_index_to_row_index : public thrust::unary_function<T,T>
   }
 };
 
-__global__ void calculate_gradients(const float * data_array_d, const int * label_vector_d, const float * weights_d, float * gradients_d, const int dimensions) {
+__global__ void calculate_gradients(const float * data_array_d, const int * label_vector_d, const float * weights_d, float * gradients_d, const int R, const int C) {
+	// TODO: R, C should be device constants
 	// Each data point should get one thread
+	// TODO: Verify that the accesses are correct, I think we modify the same elements
+	// in the gradients matrix in different threads right now, which shouldn't happen.
+	// We want each thread to take one "row" of the matrix and only modify that.
 	int example_index = blockIdx.x * blockDim.x + threadIdx.x;
 
 	// TODO: Vector operations should be done with cuBLAS using dynamic parallelism
+	if (example_index < R) {
+		printf("example_index: %d\n", example_index);
+		// Calculate prediction
+		float prediction = 0.0;
+		// TODO: Guard against accesses that go outside the data_array_d limits
+		for (int i = 0; i < C; ++i) {
+			prediction += data_array_d[example_index + i] * weights_d[i];
+		}
+		float loss_derivative = label_vector_d[example_index] - prediction;
+		//	float squared_loss = loss_derivative * loss_derivative;
 
-	// Calculate prediction
-	float prediction = 0.0;
-	// TODO: Guard against accesses that go outside the data_array_d limits
-	for (int i = 0; i < dimensions; ++i) {
-		prediction += data_array_d[example_index + i] * weights_d[i];
-	}
-	float loss_derivative = label_vector_d[example_index] - prediction;
-//	float squared_loss = loss_derivative * loss_derivative;
-
-	// Scale the prediction gradient by the loss_derivative
-	for (int i = 0; i < dimensions; ++i) {
-		// For linear models the gradient equals the features
-		gradients_d[example_index + i] = loss_derivative * data_array_d[example_index + i];
+		// Scale the prediction gradient by the loss_derivative
+		for (int i = 0; i < C; ++i) {
+			// For linear models the gradient equals the features
+			gradients_d[example_index + i] = loss_derivative * data_array_d[example_index + i];
+		}
 	}
 }
 
@@ -136,11 +142,12 @@ int main(int argc, char **argv) {
 	for (int iteration = 1; iteration <= MAX_ITERATIONS; ++iteration) {
 		thrust::fill(gradients.begin(), gradients.end(), 0.0);
 		//Calculate the gradient vector for each datapoint
-		calculate_gradients<<<iDivUp(R*C, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
+		calculate_gradients<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
 				data_raw_ptr,
 				labels_raw_ptr,
 				weights_raw_ptr,
 				gradients_raw_ptr,
+				R,
 				C);
 
 		// Sum/reduce the gradient vectors
