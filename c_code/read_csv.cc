@@ -49,7 +49,7 @@ std::vector<StringVector> read_csv(std::string filename)
 // TODO: Separate class label from features (i.e. take first or last element of vector)
 
 // Read an example csv file and print it out
-int main(int argc, char **argv) {
+int main() {
 
 	std::string line;
 	std::vector<StringVector> string_vectors;
