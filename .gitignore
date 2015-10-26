@@ -42,3 +42,10 @@
 *.bbl
 *.blg
 *.log
+
+# Eclipse/Nsight
+.project
+.cproject
+.settings/
+c_code/data/.ptp-sync-folder
+.ptp-sync/
