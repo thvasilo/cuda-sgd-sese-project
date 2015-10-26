@@ -1,8 +1,5 @@
 #include "sgd_thrust.cuh"
 
-#include <thrust/host_vector.h>
-#include <thrust/device_vector.h>
-#include <thrust/device_ptr.h>
 
 // convert a linear index to a row index
 template <typename T>

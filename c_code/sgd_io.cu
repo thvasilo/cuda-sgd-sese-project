@@ -1,6 +1,5 @@
 #include "sgd_io.cuh"
 
-#include <string>
 
 void print_vector(const thrust_host_float rowvector, const std::string name) {
 	std::cout << name << " = [ ";
