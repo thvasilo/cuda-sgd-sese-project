@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
 	}
 
 	// Initialize gradients
-	thrust_dev_float gradients(R * C);
+	thrust_dev_float gradients(batchsize * C);
 	float * gradients_raw_ptr = thrust::raw_pointer_cast(gradients.data());
 
 	//Initialize errors vector
@@ -80,8 +80,8 @@ int main(int argc, char **argv) {
 	float * errors_raw_ptr = thrust::raw_pointer_cast(errors.data());
 
 	// Allocate storage for row sums and indices
-	thrust_dev_float row_sums(R);
-	thrust_dev_int row_indices(R);
+	thrust_dev_float row_sums(batchsize);
+	thrust_dev_int row_indices(batchsize);
 
 	// Initialize batch indices vector
 	thrust_dev_int batch_indices(batchsize);
@@ -108,10 +108,10 @@ int main(int argc, char **argv) {
 		// Sum/reduce the gradient vectors
 		thrust::fill(row_sums.begin(), row_sums.end(), 0.0);
 		thrust::fill(row_indices.begin(), row_indices.end(), 0.0);
-		calculate_row_sums(R, C, gradients, row_sums, row_indices);
+		calculate_row_sums(batchsize, C, gradients, row_sums, row_indices);
 
 		// Scale gradient sum vector
-		thrust::for_each(row_sums.begin(), row_sums.end(), _1 / (float)R);
+		thrust::for_each(row_sums.begin(), row_sums.end(), _1 / (float)batchsize);
 
 		//Update the weight vector
 		float a = -(learning_rate / std::sqrt(iteration));
