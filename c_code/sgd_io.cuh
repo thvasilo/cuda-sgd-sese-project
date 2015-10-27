@@ -15,9 +15,7 @@
 #include <string>
 #include <cmath>
 
-#include <thrust/host_vector.h>
-
-typedef thrust::host_vector<float> thrust_host_float;
+#include "typedefs.cuh"
 
 void print_vector(const thrust_host_float rowvector, const std::string name);
 

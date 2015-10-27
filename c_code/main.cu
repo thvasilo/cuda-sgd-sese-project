@@ -1,5 +1,7 @@
+#include "typedefs.cuh"
 #include "sgd_io.cuh"
 #include "sgd_thrust.cuh"
+#include "sampling.cuh"
 
 #include <thrust/generate.h>
 #include <thrust/reduce.h>
@@ -8,8 +10,6 @@
 #include <thrust/inner_product.h>
 #include <thrust/device_ptr.h>
 
-typedef thrust::host_vector<float> thrust_host_float;
-
 using namespace thrust::placeholders;
 
 // Function to divide tasks up to threads
@@ -17,7 +17,8 @@ using namespace thrust::placeholders;
 int iDivUp(int a, int b){ return ((a % b) != 0) ? (a / b + 1) : (a / b); }
 
 // Usage: Run with all arguments:
-// args: [learning_rate] [iterations] [data_csv_file] [num_rows] [num_features]
+// args: [learning_rate] [iterations] [data_csv_file] [num_rows] [num_features] [batchsize]
+// Setting batchsize to 0 uses the full data at each iteration
 // NB: We are assuming that the csv has the format [features],[label]
 // i.e. the last column is the label, and all others are features.
 // num_features should equal the number of features only, i.e. the number of columns in the csv minus 1
@@ -25,21 +26,25 @@ int iDivUp(int a, int b){ return ((a % b) != 0) ? (a / b + 1) : (a / b); }
 // or with real data: > ./main 0.000004 500 data/ENB2012_data_Y1.csv 768 8
 int main(int argc, char **argv) {
 
-	if	(argc != 6) {
+	if	(argc != 7) {
 		std::cout << "usage: ./sgd_thrust.o [learning_rate] "
-				"[iterations] [data_csv_file] [num_rows] [num_features]" << std::endl;
+				"[iterations] [data_csv_file] [num_rows] [num_features] [batchsize]" << std::endl;
+		return 1;
 	}
 
 	float learning_rate = atof(argv[1]);
-	int MAX_ITERATIONS = atoi(argv[2]);
-	std::string filename = argv[3];
-	int R = atoi(argv[4]);;
-	int C = atoi(argv[5]);;
+	const int MAX_ITERATIONS = atoi(argv[2]);
+	const std::string filename = argv[3];
+	const int R = atoi(argv[4]);
+	const int C = atoi(argv[5]);
+	const int batchsize = (atoi(argv[6])  == 0) ? R : atoi(argv[6]);
+
 
 	std::cout << "lr: " << learning_rate << std::endl;
 
 	// The number of threads we allocate per block
-	const int THREADS_PER_BLOCK = 256;
+	const int THREADS_PER_BLOCK = batchsize;
+
 
 	// Initialize data vector on host
 	thrust_host_float data_h(R * C);
@@ -78,21 +83,24 @@ int main(int argc, char **argv) {
 	thrust_dev_float row_sums(R);
 	thrust_dev_int row_indices(R);
 
-	// Print out data and labels
-//	print_matrix(data_d, "data", R, C);
-//	print_vector<thrust_dev_float>(labels_d, "labels");
+	// Initialize batch indices vector
+	thrust_dev_int batch_indices(batchsize);
+	int * batch_indices_ptr = thrust::raw_pointer_cast(batch_indices.data());
 
 	// TODO: Put iterations in SGD_Step function
 	for (int iteration = 1; iteration <= MAX_ITERATIONS; ++iteration) {
 		// Reset gradients and errors
 		thrust::fill(gradients.begin(), gradients.end(), 0.0);
 		thrust::fill(errors.begin(), errors.end(), 0.0);
+		// Fill indices vector
+		SampleWithoutReplacement(R, batchsize, batch_indices);
 
 		//Calculate the gradient vector for each datapoint
-		calculate_gradients<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
+		calculate_gradients<<<iDivUp(batchsize, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
 				data_raw_ptr,
 				labels_raw_ptr,
 				weights_raw_ptr,
+				batch_indices_ptr,
 				gradients_raw_ptr,
 				R,
 				C);
@@ -107,29 +115,30 @@ int main(int argc, char **argv) {
 
 		//Update the weight vector
 		float a = -(learning_rate / std::sqrt(iteration));
-//		std::cout << "a: " << a << std::endl;
+		//		std::cout << "a: " << a << std::endl;
 		// Thrust SAXPY
 		thrust::transform(row_sums.begin(), row_sums.end(),  // input range #1
-		                      weights.begin(),           // input range #2
-		                      weights.begin(),           // output range
-		                      a * _1 + _2);        // placeholder expression
+				weights.begin(),           // input range #2
+				weights.begin(),           // output range
+				a * _1 + _2);        // placeholder expression
 
 		// Calculate the squared error for each data point
-//		cudaDeviceSynchronize();
+		//		cudaDeviceSynchronize();
 		squared_errors<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
-						data_raw_ptr,
-						labels_raw_ptr,
-						weights_raw_ptr,
-						errors_raw_ptr,
-						R,
-						C);
+				data_raw_ptr,
+				labels_raw_ptr,
+				weights_raw_ptr,
+				errors_raw_ptr,
+				R,
+				C);
 		// Reduce/sum the errors
 		float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
 		// Print weights and squared error sum
 		print_vector(weights, "weights");
 		std::cout << "Squared error sum: " << sq_err_sum << std::endl;
-//		print_matrix(gradients, "weight_gradients", R, C);
+		//		print_matrix(gradients, "weight_gradients", R, C);
 	}
+
 
 
 	return 0;

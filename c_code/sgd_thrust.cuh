@@ -8,9 +8,7 @@
 #ifndef SGD_THRUST_CUH_
 #define SGD_THRUST_CUH_
 
-#include <thrust/device_vector.h>
-typedef thrust::device_vector<float> thrust_dev_float;
-typedef thrust::device_vector<int> thrust_dev_int;
+#include "typedefs.cuh"
 
 __device__ float squared_loss_derivative(
 	const float * data_array_d,
@@ -30,6 +28,7 @@ __global__ void calculate_gradients(
 	const float * data_array_d,
 	const float * label_vector_d,
 	const float * weights_d,
+	const int * batch_indices_d,
 	float * gradients_d,
 	const int R,
 	const int C);
