@@ -1,22 +1,5 @@
-#include <iostream>
-#include <cmath>
-#include <thrust/host_vector.h>
-#include <thrust/device_vector.h>
-#include <thrust/generate.h>
-#include <thrust/reduce.h>
-#include <thrust/functional.h>
-#include <thrust/random.h>
-#include <thrust/inner_product.h>
-#include <thrust/device_ptr.h>
+#include "sgd_thrust.cuh"
 
-using namespace thrust::placeholders;
-
-// Function to divide tasks up to threads
-// Arguments: a: number of items to divide, b: desired number of threads in each block
-int iDivUp(int a, int b){ return ((a % b) != 0) ? (a / b + 1) : (a / b); }
-
-typedef thrust::device_vector<float> thrust_dev_float;
-typedef thrust::device_vector<int> thrust_dev_int;
 
 // convert a linear index to a row index
 template <typename T>
@@ -34,42 +17,81 @@ struct linear_index_to_row_index : public thrust::unary_function<T,T>
   }
 };
 
-__device__ void print_device_vector(const float * vector, const int size, const char* name) {
-	printf("%s", name);
-	for (int i = 0; i < size; ++i) {
-		printf("%s ", vector[i]);
+
+/**
+ * Returns the squared loss derivative
+ * The way this works is: We provide pointers to items inside the data and label vectors,
+ * and we proceed to take the C next elements from the data array and the weights,
+ * to calculate their inner product. We then dereference the pointer to the label vector
+ * to get the value at the position.
+ */
+__device__ float squared_loss_derivative(
+	const float * data_array_d,
+	const float * label_vector_d,
+	const float * weights_d,
+	const int C) {
+
+	// Calculate prediction
+	float prediction = 0.0;
+	// TODO: Guard against accesses that go outside the data_array_d limits
+	// TODO: Vector operations should be done with cuBLAS using dynamic parallelism
+	for (int i = 0; i < C; ++i) {
+		prediction += data_array_d[i] * weights_d[i];
 	}
-	printf(" ]\n");
+	// For squared loss the loss derivative is equal to the simple loss: (y_hat - y_true)
+	float loss_derivative = prediction - *label_vector_d;
+	return loss_derivative;
 }
 
-__global__ void calculate_gradients(const float * data_array_d, const int * label_vector_d, const float * weights_d, float * gradients_d, const int R, const int C) {
+__global__ void squared_errors(
+	const float * data_array_d,
+	const float * label_vector_d,
+	const float * weights_d,
+	float * errors,
+	const int R,
+	const int C) {
+
+	int thread_index = blockIdx.x * blockDim.x + threadIdx.x;
+	int example_index = thread_index * C;
+	if (thread_index < R) {
+		float loss_derivative = squared_loss_derivative(
+				&data_array_d[example_index],
+				&label_vector_d[thread_index],
+				weights_d,
+				C);
+		errors[thread_index] = loss_derivative * loss_derivative;
+	}
+}
+
+__global__ void calculate_gradients(
+	const float * data_array_d,
+	const float * label_vector_d,
+	const float * weights_d,
+	const int * batch_indices_d,
+	float * gradients_d,
+	const int R,
+	const int C) {
 	// TODO: R, C should be device constants
 	// Each data point should get one thread
-	// TODO: Verify that the accesses are correct, I think we modify the same elements
-	// in the gradients matrix in different threads right now, which shouldn't happen.
 	// We want each thread to take one "row" of the matrix and only modify that.
+<<<<<<< HEAD
     int thread_index = blockIdx.x * blockDim.x + threadIdx.x; // Should be row index
 	int example_index = thread_index * C;
+=======
+	int thread_index = blockIdx.x * blockDim.x + threadIdx.x;
+>>>>>>> b9d1443efccce2055635da5bdf0781a64dd25cca
 
 	// TODO: Vector operations should be done with cuBLAS using dynamic parallelism
 	if (thread_index < R) {
-//		printf("example_index: %d\n", example_index);
-		// Calculate prediction
-		float prediction = 0.0;
-		// TODO: Guard against accesses that go outside the data_array_d limits
-		for (int i = 0; i < C; ++i) {
-			prediction += data_array_d[example_index + i] * weights_d[i];
-		}
-//		if (thread_index <= 1) {
-			printf("prediction in %d: %f\n", thread_index, prediction);
-//		}
-		// For squared loss the loss derivative is equal to the simple loss: (y_hat - y_true)
-		float loss_derivative = prediction - label_vector_d[thread_index];
-//		if (thread_index <= 1) {
-			printf("loss_deriv in %d: %f\n", thread_index, loss_derivative);
-//		}
-		//	float squared_loss = loss_derivative * loss_derivative;
-
+		int example_index = batch_indices_d[thread_index] * C;
+//		printf("thread idx: %d, example idx: %d\n", thread_index, example_index);
+		// Here we call squared_loss_derivative with the correct offsets, example_index for the data array
+		// and thread_index for the labels array
+		float loss_derivative = squared_loss_derivative(
+				&data_array_d[example_index],
+				&label_vector_d[thread_index],
+				weights_d,
+				C);
 		// Scale the gradient by the loss_derivative
 		for (int i = 0; i < C; ++i) {
 			// For linear models the gradient equals the features
@@ -78,7 +100,12 @@ __global__ void calculate_gradients(const float * data_array_d, const int * labe
 	}
 }
 
-__host__ void calculate_row_sums(const int R, const int C, const thrust_dev_float& array, thrust_dev_float& row_sums, thrust_dev_int& row_indices) {
+__host__ void calculate_row_sums(
+	const int R,
+	const int C,
+	const thrust_dev_float & array,
+	thrust_dev_float & row_sums,
+	thrust_dev_int & row_indices) {
 	// compute row sums by summing values with equal row indices
 	thrust::reduce_by_key(
 		thrust::make_transform_iterator(thrust::counting_iterator<int>(0), linear_index_to_row_index<int>(C)),
@@ -88,124 +115,4 @@ __host__ void calculate_row_sums(const int R, const int C, const thrust_dev_floa
 		row_sums.begin(),
 		thrust::equal_to<int>(),
 		thrust::plus<float>());
-}
-
-template<typename T>
-__host__ void print_vector(const T rowvector, const std::string name) {
-	std::cout << name << " = [ ";
-	for(auto element : rowvector)
-	{
-		std::cout << element << " ";
-	}
-	std::cout << "]" << std::endl;
-}
-
-__host__ void print_matrix(const thrust_dev_float matrix, const std::string name, const int R, const int C) {
-	std::cout << name << std::endl;
-	for(int i = 0; i < R; i++)
-	{
-		std::cout << "[ ";
-		for(int j = 0; j < C; j++)
-		  std::cout << matrix[i * C + j] << " ";
-		std::cout << "]" << std::endl;
-	}
-}
-
-// TODO: Combine all iteration steps into one function
-//__host__ void SGDStep(int R, int C, float * data_array_d, )
-
-// Usage: run without arguments, or with both initial learning rate and number of iterations.
-// e.g.: > ./sgd_thrust.o 0.0001 20
-int main(int argc, char **argv) {
-
-	float learning_rate;
-	int MAX_ITERATIONS;
-	if (argc == 1) {
-		learning_rate = 0.001;
-		MAX_ITERATIONS = 10;
-	} else {
-		learning_rate = atof(argv[1]);
-		MAX_ITERATIONS = atoi(argv[2]);
-	}
-	std::cout << "lr: " << learning_rate << std::endl;
-
-	const int THREADS_PER_BLOCK = 256;
-	int R = 5;     // number of rows
-	int C = 8;     // number of columns
-	thrust::default_random_engine rng;
-	thrust::uniform_real_distribution<float> dist(10, 99);
-	thrust::uniform_real_distribution<float> weight_dist(0.0, 0.01);
-	thrust::uniform_int_distribution<int> label_dist(0, 1);
-
-	// Initialize data
-	thrust_dev_float array(R * C);
-	// note: d_vec.data() returns a device_ptr
-	float * data_raw_ptr = thrust::raw_pointer_cast(array.data());
-	for (size_t i = 0; i < array.size(); i++) {
-		array[i] = dist(rng);
-	}
-
-	// Initialize labels
-	thrust_dev_int labels(R);
-	int * labels_raw_ptr = thrust::raw_pointer_cast(labels.data());
-	for (size_t i = 0; i < labels.size(); i++) {
-			labels[i] = label_dist(rng);
-	}
-
-	// Initialize weights
-	thrust_dev_float weights(C);
-	// note: d_vec.data() returns a device_ptr
-	float * weights_raw_ptr = thrust::raw_pointer_cast(weights.data());
-	for (size_t i = 0; i < weights.size(); i++) {
-				weights[i] = weight_dist(rng);
-	}
-
-	// Initialize gradients
-	thrust_dev_float gradients(R * C);
-	// note: d_vec.data() returns a device_ptr
-	float * gradients_raw_ptr = thrust::raw_pointer_cast(gradients.data());
-
-	// allocate storage for row sums and indices
-	thrust_dev_float row_sums(R);
-	thrust_dev_int row_indices(R);
-
-	print_matrix(array, "data", R, C);
-	print_vector<thrust_dev_int>(labels, "labels");
-
-	for (int iteration = 1; iteration <= MAX_ITERATIONS; ++iteration) {
-		// Reset gradients
-		thrust::fill(gradients.begin(), gradients.end(), 0.0);
-
-		//Calculate the gradient vector for each datapoint
-		calculate_gradients<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
-				data_raw_ptr,
-				labels_raw_ptr,
-				weights_raw_ptr,
-				gradients_raw_ptr,
-				R,
-				C);
-
-		// Sum/reduce the gradient vectors
-		thrust::fill(row_sums.begin(), row_sums.end(), 0.0);
-		thrust::fill(row_indices.begin(), row_indices.end(), 0.0);
-		calculate_row_sums(R, C, gradients, row_sums, row_indices);
-
-		// Scale gradient sum vector
-		thrust::for_each(row_sums.begin(), row_sums.end(), _1 / (float)R);
-
-		//Update the weight vector
-		float a = -(learning_rate / std::sqrt(iteration));
-		std::cout << "a: " << a << std::endl;
-		// Thrust SAXPY
-		thrust::transform(row_sums.begin(), row_sums.end(),  // input range #1
-		                      weights.begin(),           // input range #2
-		                      weights.begin(),           // output range
-		                      a * _1 + _2);        // placeholder expression
-
-		print_vector<thrust_dev_float>(weights, "weights");
-		print_matrix(gradients, "weight_gradients", R, C);
-	}
-
-
-	return 0;
 }
