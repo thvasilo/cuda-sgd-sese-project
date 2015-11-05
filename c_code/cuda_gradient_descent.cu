@@ -152,6 +152,6 @@ int main(){
 		print_vector(y_predic, Ndata);
     }
 
-  return 0;
+    return 0;
 
 }
