@@ -3,6 +3,7 @@
 #include "sgd_thrust.cuh"
 #include "sampling.cuh"
 
+#include <algorithm>
 #include <thrust/generate.h>
 #include <thrust/reduce.h>
 #include <thrust/functional.h>
@@ -33,14 +34,16 @@ int main(int argc, char **argv) {
 	}
 
 	float learning_rate = atof(argv[1]);
-	const int MAX_ITERATIONS = atoi(argv[2]);
+	const int MAX_EPOCHS = atoi(argv[2]);
 	const std::string filename = argv[3];
 	const int R = atoi(argv[4]);
 	const int C = atoi(argv[5]);
 	const int batchsize = (atoi(argv[6])  == 0) ? R : atoi(argv[6]);
-
+	const int num_batches = (int)std::floor(R/(float)batchsize);
 
 	std::cout << "lr: " << learning_rate << std::endl;
+	std::cout << "batchsize: " << batchsize << std::endl;
+	std::cout << "num_batches: " << num_batches << std::endl;
 
 	// The number of threads we allocate per block
 	const int THREADS_PER_BLOCK = batchsize;
@@ -84,44 +87,56 @@ int main(int argc, char **argv) {
 	thrust_dev_int row_indices(batchsize);
 
 	// Initialize batch indices vector
-	thrust_dev_int batch_indices(batchsize);
+	thrust_dev_int batch_indices(R);
 	int * batch_indices_ptr = thrust::raw_pointer_cast(batch_indices.data());
+	// Fill indices vector, we first create and index vector, shuffle it and copy to device vector
+	std::vector<int> ind_vector(R);
+	for (int i = 0; i < R; ++i) {
+		ind_vector[i] = i;
+	}
+	std::random_shuffle(ind_vector.begin(), ind_vector.end());
+	batch_indices = ind_vector;
+//	print_vector(batch_indices, "batch_indices");
 
 	// TODO: Put iterations in SGD_Step function
-	for (int iteration = 1; iteration <= MAX_ITERATIONS; ++iteration) {
-		// Reset gradients and errors
-		thrust::fill(gradients.begin(), gradients.end(), 0.0);
-		thrust::fill(errors.begin(), errors.end(), 0.0);
-		// Fill indices vector
-		SampleWithoutReplacement(R, batchsize, batch_indices);
+	for (int epoch = 1; epoch <= MAX_EPOCHS; ++epoch) {
+		// We shuffle the data indexes before the start of each epoch
+		// TODO: How is performance if we shuffle the data instead of indices, i.e. having sequential accesses instead of random?
+		std::random_shuffle ( ind_vector.begin(), ind_vector.end());
+		batch_indices = ind_vector; // TODO: Remove host-device copy, can we shuffle on the GPU instead?
+		for (int batch = 0; batch < num_batches; ++batch) {
+			// Reset gradients and errors
+			thrust::fill(gradients.begin(), gradients.end(), 0.0);
+			thrust::fill(errors.begin(), errors.end(), 0.0);
 
-		//Calculate the gradient vector for each datapoint
-		calculate_gradients<<<iDivUp(batchsize, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
-				data_raw_ptr,
-				labels_raw_ptr,
-				weights_raw_ptr,
-				batch_indices_ptr,
-				gradients_raw_ptr,
-				R,
-				C);
 
-		// Sum/reduce the gradient vectors
-		thrust::fill(row_sums.begin(), row_sums.end(), 0.0);
-		thrust::fill(row_indices.begin(), row_indices.end(), 0.0);
-		calculate_row_sums(batchsize, C, gradients, row_sums, row_indices);
+			//Calculate the gradient vector for each datapoint
+			calculate_gradients<<<iDivUp(batchsize, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
+					data_raw_ptr,
+					labels_raw_ptr,
+					weights_raw_ptr,
+					batch_indices_ptr  + (batch * batchsize),
+					gradients_raw_ptr,
+					R,
+					C);
 
-		// Scale gradient sum vector
-		thrust::for_each(row_sums.begin(), row_sums.end(), _1 / (float)batchsize);
+			// Sum/reduce the gradient vectors
+			thrust::fill(row_sums.begin(), row_sums.end(), 0.0);
+			thrust::fill(row_indices.begin(), row_indices.end(), 0.0);
+			calculate_row_sums(batchsize, C, gradients, row_sums, row_indices);
 
-		//Update the weight vector
-		float a = -(learning_rate / std::sqrt(iteration));
-		//		std::cout << "a: " << a << std::endl;
-		// Thrust SAXPY
-		thrust::transform(row_sums.begin(), row_sums.end(),  // input range #1
-				weights.begin(),           // input range #2
-				weights.begin(),           // output range
-				a * _1 + _2);        // placeholder expression
+			// Scale gradient sum vector
+			thrust::for_each(row_sums.begin(), row_sums.end(), _1 / (float)batchsize);
 
+			//Update the weight vector
+			float a = -(learning_rate / std::sqrt(epoch));
+			//		std::cout << "a: " << a << std::endl;
+			// Thrust SAXPY
+			thrust::transform(row_sums.begin(), row_sums.end(),  // input range #1
+					weights.begin(),           // input range #2
+					weights.begin(),           // output range
+					a * _1 + _2);        // placeholder expression
+		}
 		// Calculate the squared error for each data point
 		//		cudaDeviceSynchronize();
 		squared_errors<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
@@ -133,13 +148,14 @@ int main(int argc, char **argv) {
 				C);
 		// Reduce/sum the errors
 		float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
-		// Print weights and squared error sum
-		print_vector(weights, "weights");
-		std::cout << "Squared error sum: " << sq_err_sum << std::endl;
-		//		print_matrix(gradients, "weight_gradients", R, C);
+		if	(epoch % 100 == 0) {
+			printf("epoch: %d\n", epoch);
+			// Print weights and squared error sum
+			print_vector(weights, "weights");
+			std::cout << "Squared error sum: " << sq_err_sum << std::endl;
+			//		print_matrix(gradients, "weight_gradients", R, C);
+		}
 	}
-
-
 
 	return 0;
 }

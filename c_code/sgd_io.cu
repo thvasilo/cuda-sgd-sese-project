@@ -10,6 +10,15 @@ void print_vector(const thrust_host_float rowvector, const std::string name) {
 	std::cout << "]" << std::endl;
 }
 
+void print_int_vector(const thrust_dev_int rowvector, const std::string name) {
+	std::cout << name << " = [ ";
+	for(auto element : rowvector)
+	{
+		std::cout << element << " ";
+	}
+	std::cout << "]" << std::endl;
+}
+
 void print_matrix(const thrust_host_float matrix, const std::string name, const int R, const int C) {
 	std::cout << name << std::endl;
 	for(int i = 0; i < R; i++)

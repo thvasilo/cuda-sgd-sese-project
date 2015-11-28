@@ -19,6 +19,8 @@
 
 void print_vector(const thrust_host_float rowvector, const std::string name);
 
+void print_int_vector(const thrust_dev_int rowvector, const std::string name);
+
 void print_matrix(const thrust_host_float matrix, const std::string name, const int R, const int C);
 
 /**
