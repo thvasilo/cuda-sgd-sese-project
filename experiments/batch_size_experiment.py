@@ -33,7 +33,6 @@ for batch_size in batch_sizes_iter:
     batch_sizes.append(threads[1])
 
 
-
 # Transform the inputs from string to units
 times = [float(t) for t in times]
 Nblocks = [int(N) for N in Nblocks]    

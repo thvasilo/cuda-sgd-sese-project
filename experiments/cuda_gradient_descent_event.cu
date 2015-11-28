@@ -167,7 +167,7 @@ int main(int argc, char *argv[]){
     float miliseconds = 0;
     cudaEventElapsedTime(&miliseconds, start, stop);
     printf("kernel time = %f \n", miliseconds);
-
+    
     // Run information
     printf("Number of blocks = %d \n", Nbatch);
     printf("Number of threads per block = %d \n", batch_size);
