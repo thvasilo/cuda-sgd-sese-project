@@ -10,12 +10,13 @@ cmd = './main'
 
 learning_rate = 0.5
 iterations = 1000
-name = './data/python_data'
+name = './data/python_data3'
+name = './data/5xy'
 dataset = name + '.csv'
 weights_file = name + '_weights' + '.csv'
-batch_size = 100
-R = 1000
-C = 4
+batch_size = 5
+R = 40
+C = 1
 
 # Read the weights
 with open(weights_file, 'r') as f:
@@ -26,8 +27,9 @@ with open(weights_file, 'r') as f:
 true_weights = [float(w) for w in true_weights]
 true_weights = np.asarray(true_weights)
         
-# Iterate over batch_sizes
-batch_sizes = np.arange(10, 100, 10)
+# Iterate over learning_rate
+learning_rates = np.array([0.001, 0.1, 0.5, 1, 10, 15, 25])
+learning_rates = np.array([0.001, 0.002, 0.005, 0.01])
 
 # Initialize list to store
 memory_times = []
@@ -38,7 +40,7 @@ kernel_times = []
 
 
 # Now we run the process
-for batch_size in batch_sizes:
+for learning_rate in learning_rates:
     parameters = [learning_rate, iterations, dataset, R, C, batch_size]
     parameters = [str(par) for par in parameters]
     run_line = [cmd]
@@ -65,8 +67,16 @@ for batch_size in batch_sizes:
     kernel_time =  lines[3].split('=')
     kernel_times.append(kernel_time[1])
 
-# Plot everything
-# times = [float(t) for t in times]
-# plt.plot(batch_sizes, times)
-# plt.show()
+# Transform to arrays the relevant quantities
+kernel_times = [float(t) for t in kernel_times]
+errors = np.asarray([float(e) for e in errors])
+weights_errors = [np.linalg.norm(true_weights - ws) for ws in weights_collection]
 
+# Now plot everything
+plt.subplot(2, 1, 1)
+plt.title('weight_errors')
+plt.plot(learning_rates, weights_errors, '*-')
+plt.subplot(2, 1, 2)
+plt.title('errors')
+plt.plot(learning_rates, errors, '*-')
+plt.show()

@@ -39,8 +39,12 @@ int main(int argc, char **argv) {
 	const int C = atoi(argv[5]);
 	const int batchsize = (atoi(argv[6])  == 0) ? R : atoi(argv[6]);
 
+	cudaEvent_t start_memory;
+	cudaEvent_t stop_memory;
 
-	// std::cout << "lr: " << learning_rate << std::endl;
+	// Create the events
+	cudaEventCreate(&start_memory);
+	cudaEventCreate(&stop_memory);
 
 	// The number of threads we allocate per block
 	const int THREADS_PER_BLOCK = batchsize;
@@ -86,6 +90,14 @@ int main(int argc, char **argv) {
 	// Initialize batch indices vector
 	thrust_dev_int batch_indices(batchsize);
 	int * batch_indices_ptr = thrust::raw_pointer_cast(batch_indices.data());
+
+	// Get the second time
+	cudaEventRecord(stop_memory);
+	cudaEventSynchronize(stop_memory);
+	float miliseconds_memory = 0;
+	cudaEventElapsedTime(&miliseconds_memory, start_memory, stop_memory);
+	printf("Memory time = %f \n", miliseconds_memory);
+
 
 	// Timers
 	cudaEvent_t start;
@@ -145,11 +157,16 @@ int main(int argc, char **argv) {
 		// Reduce/sum the errors
 		float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
 		// Print weights and squared error sum
-		//  print_vector(weights, "weights");
+
 		// std::cout << "Squared error sum: " << sq_err_sum << std::endl;
 		//		print_matrix(gradients, "weight_gradients", R, C);
 	}
 
+	// Print final quantities
+	float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
+	std::cout << "Squared error sum: " << sq_err_sum << std::endl;
+	print_vector(weights, "weights");	
+	
 	// Get the second time
 	cudaEventRecord(stop);
 	cudaEventSynchronize(stop);
