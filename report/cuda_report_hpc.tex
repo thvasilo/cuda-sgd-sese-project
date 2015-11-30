@@ -11,8 +11,9 @@
 \usepackage{siunitx}  % Units of the metric system  \SI{2.63}{\ohm}   
 \usepackage[font={footnotesize}]{caption} %Makes the captions small
 
-\usepackage{algorithm}
-\usepackage{algpseudocode}
+%\usepackage{algorithm}
+%\usepackage{algpseudocode}
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
 
 %% Figures packages
 \usepackage[pdftex]{graphicx}
@@ -84,7 +85,7 @@ Akash Kumar Dhaka  akashd@kth.se
 
 % Author and supervisor
 
-Authors: Ram\'on  Mart\'inez, Theodore Vasiloudis   \\ 
+Authors: Ram\'on  Mart\'inez, Theodoros Vasiloudis   \\ 
 \large Professors: One Dude, The other dude.  \\ [2.5cm]
 %\normalsize Presenta \\
 %\large Supervisors 2: Jan Antolik \\[2.5cm]
@@ -120,19 +121,108 @@ The general method of Gradient Descent proposes moving in the direction of the g
 w_{t + 1} = w_t - \gamma \sum_{i=1}^n \triangledown_w Q(z_i, w)
 \end{equation}
 
-Where $gamma$ is called the usually called the learning rate and controls the speed of convergence (or divergence if it is too big). 
+Where $\gamma$ is usually called the learning rate and controls the speed of rate of change of in $w$, and can be of crucial
+importance for the convergence or divergence of the algorithm. 
 
 Under sufficient regularity assumptions when the initial estimate of $w$ is close enough to the minimum and the learning rate is small enough this algorithm can achieve linear convergence \citep{dennis1996numerical}. 
 
-Stochastic Gradient Descent is a simplification of the scheme proposed above. In this case the average over the sample space is put aside and instead we use the local gradient to indicate the proper direction of movement:
+Stochastic Gradient Descent (SGD) is a simplification of the scheme proposed above. In this case the average over the sample space is put aside and instead we use the local gradient to indicate the proper direction of movement:
 
 \begin{equation}
 w_{t + 1} = w_t - \gamma  \triangledown_w Q(z_i, w)
 \end{equation} 
 
-It follows from the algorithm that this optimazation can be implemented online due to the fact that not memory is needed no the calculation. The convergence of stochastic gradient descent is granted in some mild conditions when the learning rate $gamma$ decreases over time in such a way that the series indexed by them does not diverge \citep{bottou2010large}. 
+It follows from the algorithm that this optimization can be implemented online due to the fact that 
+no memory is needed for the calculation. The convergence of stochastic gradient descent is granted in 
+some mild conditions when the learning rate $\gamma$ decreases over time in such a way that the series 
+indexed by them does not diverge \citep{bottou2010large}. 
 
-It is the general wisdom that when the learning samples form a big set (big data) Stochastic Gradient Descent can achieve a better performance that its normal version. There is research, however, that points out the domain of application of this method is greater and overall surpasses Gradient Descent in most of domains \citep{wilson2003general}. 
+In /citep{wilson2003general} it shown that, perhaps counter-intuitively, batch gradient descent has worse runtime
+and convergence characteristics when compared to stochastic gradient descent.
+
+Mini-batch stochastic gradient descent lies somewhere in the middle between these two algorithms. There, the optimization
+process if performed on small subsets of the complete dataset that are called \textit{batches}. At each step in the algorithm
+we choose a random subset of the data, calculate the gradient, and update the weights, based on the information we are able
+to get from the batch. The main advantage in speed for mini-batch SGD comes from the fact that instead of the matrix-vector
+multiplications that are necessary in plain SGD, we are able to batch samples together and perform matrix-matrix
+multiplications, thereby allowing for a more efficient learning process.
+
+\section{Parallel Stochastic Gradient Descent}
+
+There exist a number of approaches for parallelizing SGD \citep{zinkevich2010parallelized, recht2011hogwild, dekel2012optimal},
+and each comes with some advantages and disadvantages. Some of these algorithms are mostly intended to be used in a distributed setting,
+but can however be adapted to function well in a highly parallel setting as well.
+
+The approach presented in \cite{zinkevich2010parallelized} is an
+intuitive parallel extension of SGD, where each processor solves a local SGD problem according using a random partition
+of the complete dataset, and the solutions from each processor are then communicated and averaged. This approach involves
+practically no communication between the processors during the optimization phase, which while beneficial in terms of
+network/communication costs, results in subpar performance when it comes to the optimality of the solution.
+ 
+\cite{recht2011hogwild} also propose an asynchronous algorithm which is aimed at problems with sparse parameters, i.e.
+we assume that the cost function we are optimizing is decomposable (to a degree). This property makes it possible for
+individual processors to work on different parts of $w$, and perform gradient descent using only a single parameter
+from the complete weight vector, making it possible to atomically update that single parameter, in parallel with
+the other processors, without the need for locking the weight vector while one processor makes its updates.
+While this approach allow for fast iterations since each processor can work and update his part of the solution
+independently from the others, it has the additional assumption of problem sparsity and the lack of communication
+between processors can often lead to diverging solutions \cite{dai2015analysis}.
+
+\cite{dekel2012optimal} show a distributed mini-batch SGD approach which they claim is optimal in terms of the
+\textit{optimality gap} which they define as the difference between the loss given by the optimal weight vector
+$Q(z, w^*)$ and the approximation obtained by the algorithm, $Q(z, \bar{w})$. The algorithm proposed uses
+mini-batches to calculate approximate gradients for each processor, which are then summed and averaged across the
+different processors, and the averaged gradient is used to update the weights at the end of each iteration.
+While this algorithm obviously has higher communication costs when compared to the ones we described before,
+it can attain better convergence guarantees, and enjoys faster convergence in terms of number of iterations,
+as the different processors have access to more up-to-date and consistent sets of weights.
+One drawback of this approach when it comes to highly parallel architectures however is that its parallelization
+factor is limited by the minimum of number of batches and available processors.
+
+For this work we chose a variant of the algorithm described by \cite{dekel2012optimal}, which involves the following steps:
+%TODO: Write in algorithm format
+\begin{enumerate}
+	\item  	For each iteration:
+	\begin{enumerate}
+		\item Select a subset of the data of size $b$.
+		\item Calculate the gradient for each data point in the batch.
+		\item Sum and average the gradients for all data points in the batch.
+		\item Update the weight vector according to the average gradient.
+	\end{enumerate}
+\end{enumerate}
+
+\begin{algorithm}
+	\DontPrintSemicolon % Some LaTeX compilers require you to use \dontprintsemicolon instead
+	\KwIn{A dataset $D$ of containing n $z=(x, y)$ items, initial learning rate $\alpha$}
+	\KwOut{A vector of weights providing an approximate linear solution}
+	Initialize $w$\;
+	\For{$i \gets 1$ \textbf{to} $T$} {
+		Select a random subset of $D$, $\mathbf{z}_s$\;
+		\For(\textbf{parallel}){$j \gets 1$ \textbf{to} $b$} {
+			$\hat{g_j} = \triangledown_w Q(z_j, w_i)$, where $z_j \in \mathbf{z}_s$\;
+		}
+		$\gamma = -(\alpha / \sqrt{i}))$\;
+		Do parallel sum $\sum_j{\hat{g_j}}$ to compute the average gradient for the current batch, $\bar{g_i} = 1/j \sum_j{\hat{g_j}}$\;
+		Do parallel scaling of the weight vector: $w_{i + 1} = w_i - \gamma \,  \bar{g_i}$\;
+		
+	}
+	\Return{$w_T$}\;
+	\caption{Mini-batch parallel SGD on a GPU}
+	\label{algo:sgd-gpu}
+\end{algorithm}
+
+The difference of this algorithm when compared to the one by \cite{dekel2012optimal} is that where they sum
+the gradients over all batches in order to reduce communication costs --the algorithm is aimed at a distributed environment--
+we are able to sum the gradient for the sample \textit{within} each batch. We are able to do this due to the low communication
+costs that we have once all the data is loaded to the GPU, and using this approach we able to tie the parallelization factor
+to the size of the mini-batch $b$ instead of the number of batches $c$. Depending on the data size and parameters,
+it usually true that $b \gg c$, allowing for better utilization of the GPU architecture.
+
+We employ parallelization then in 3 distinct parts of the algorithm: We calculate the gradients for each sample in a batch in
+parallel, we sum the gradients in parallel through a transform/reduce process, and scale the weight vector in parallel as well.
+The heaviest process computationally is the gradient calculation.
+
+%TODO Implementation section, talk a bit about CUDA, Thrust, C++11
 
 \bibliographystyle{plainnat}
 \bibliography{references}
