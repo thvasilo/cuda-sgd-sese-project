@@ -6,6 +6,7 @@ from __future__ import print_function
 import numpy as np
 from sklearn.datasets import make_regression
 import csv
+import sys, getopt
 
 def create_data_set(n_samples, n_features, noise=0, filename='./test', seed=42):
     """
@@ -14,13 +15,13 @@ def create_data_set(n_samples, n_features, noise=0, filename='./test', seed=42):
     Finally the data is saved in filename and the weights are saved
     as well.
     """
-    
+
     # Change this for reproducibility issues
     prng = np.random.RandomState(seed)
 
     # Generate data
     n_informative = n_features  # All feature are informative
-    n_targets = 1  # Only one target 
+    n_targets = 1  # Only one target
     bias = 0  # No bias
 
     if noise == 0.0:
@@ -50,13 +51,40 @@ def create_data_set(n_samples, n_features, noise=0, filename='./test', seed=42):
         a.writerow(w)
 
     return data, labels, w
-        
-# Parameters
-n_samples = 10000
-n_features = 10
-noise = 0.0
-seed = 42
-filename = './python_data3'
 
-# Run the program
-X, y, w = create_data_set(n_samples, n_features, noise, filename, seed)
+
+def usage():
+    print(["--samples", "--features", "--noise", "--filename", "--seed"])
+
+def main(argv):
+    # Parameters
+    n_samples = 10000
+    n_features = 10
+    noise = 0.0
+    seed = 42
+    filename = './python_data3'
+
+    try:
+        opts, args = getopt.getopt(
+            argv,
+            "s:f:n:e:o:",
+            ["samples", "features", "noise", "filename", "seed"])
+    except getopt.GetoptError:
+        usage()
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt in ["-s", "--samples"]:
+            n_samples = int(arg)
+        elif opt in ("-f", "--features"):
+            n_features = int(arg)
+        elif opt in ("-n", "--noise"):
+            noise = float(arg)
+        elif opt in ("-o", "--filename"):
+            filename = arg
+        elif opt in ("-e", "--seed"):
+            seed = int(arg)
+
+    create_data_set(n_samples, n_features, noise, filename, seed)
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
