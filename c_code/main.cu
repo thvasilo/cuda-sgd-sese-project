@@ -3,6 +3,7 @@
 #include "sgd_thrust.cuh"
 #include "sampling.cuh"
 
+#include <cmath>
 #include <thrust/generate.h>
 #include <thrust/reduce.h>
 #include <thrust/functional.h>
@@ -37,7 +38,7 @@ int main(int argc, char **argv) {
 	const std::string filename = argv[3];
 	const int R = atoi(argv[4]);
 	const int C = atoi(argv[5]);
-	const int batchsize = (atoi(argv[6])  == 0) ? R : atoi(argv[6]);
+	const int batchsize = (atoi(argv[6]) == 0) ? R : atoi(argv[6]);
 
 
 	std::cout << "lr: " << learning_rate << std::endl;
@@ -114,32 +115,46 @@ int main(int argc, char **argv) {
 		thrust::for_each(row_sums.begin(), row_sums.end(), _1 / (float)batchsize);
 
 		//Update the weight vector
-		float a = -(learning_rate / std::sqrt(iteration));
+		float a = (learning_rate / std::pow(iteration, 0.25));
 		//		std::cout << "a: " << a << std::endl;
 		// Thrust SAXPY
 		thrust::transform(row_sums.begin(), row_sums.end(),  // input range #1
 				weights.begin(),           // input range #2
 				weights.begin(),           // output range
-				a * _1 + _2);        // placeholder expression
+				_2 - a * _1);        // placeholder expression
 
-		// Calculate the squared error for each data point
-		//		cudaDeviceSynchronize();
-		squared_errors<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
-				data_raw_ptr,
-				labels_raw_ptr,
-				weights_raw_ptr,
-				errors_raw_ptr,
-				R,
-				C);
-		// Reduce/sum the errors
-		float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
-		// Print weights and squared error sum
-		print_vector(weights, "weights");
-		std::cout << "Squared error sum: " << sq_err_sum << std::endl;
-		//		print_matrix(gradients, "weight_gradients", R, C);
+
+		if (iteration % 100 == 0) {
+			std::cout << "Iteration: " << iteration << std::endl;
+			// Calculate the squared error for each data point
+			squared_errors<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
+					data_raw_ptr,
+					labels_raw_ptr,
+					weights_raw_ptr,
+					errors_raw_ptr,
+					R,
+					C);
+			// Reduce/sum the errors
+			float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
+			// Print weights and squared error sum
+			print_vector(weights, "weights");
+			std::cout << "Squared error sum: " << sq_err_sum << std::endl;
+			//		print_matrix(gradients, "weight_gradients", R, C);
+		}
 	}
 
 
-
+	squared_errors<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
+					data_raw_ptr,
+					labels_raw_ptr,
+					weights_raw_ptr,
+					errors_raw_ptr,
+					R,
+					C);
+	// Reduce/sum the errors
+	float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
+	// Print weights and squared error sum
+	print_vector(weights, "final_weights");
+	std::cout << "Final Squared error sum: " << sq_err_sum << std::endl;
 	return 0;
 }

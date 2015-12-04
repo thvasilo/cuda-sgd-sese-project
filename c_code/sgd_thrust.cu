@@ -76,7 +76,7 @@ __global__ void calculate_gradients(
 	// We want each thread to take one "row" of the matrix and only modify that.
 
 	int thread_index = blockIdx.x * blockDim.x + threadIdx.x; // Should be row index
-	int example_index = thread_index * C;
+//	int example_index = thread_index * C;
 
 	// TODO: Vector operations should be done with cuBLAS using dynamic parallelism
 	if (thread_index < R) {
