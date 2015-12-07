@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
 			thrust::fill(gradients.begin(), gradients.end(), 0.0);
 
 			//Calculate the gradient vector for each datapoint
-			calculate_gradients<<<1, THREADS_PER_BLOCK>>>(//iDivUp(batchsize, THREADS_PER_BLOCK)
+			calculate_gradients<<<iDivUp(batchsize, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(//iDivUp(batchsize, THREADS_PER_BLOCK)
 					data_raw_ptr,
 					labels_raw_ptr,
 					weights_raw_ptr,
