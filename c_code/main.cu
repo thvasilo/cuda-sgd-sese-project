@@ -42,13 +42,19 @@ int main(int argc, char **argv) {
 	const int batchsize = (atoi(argv[6])  == 0) ? R : atoi(argv[6]);
 	const int num_batches = (int)std::floor(R/(float)batchsize);
 
-	std::cout << "lr: " << learning_rate << std::endl;
-	std::cout << "batchsize: " << batchsize << std::endl;
-	std::cout << "num_batches: " << num_batches << std::endl;
+	// std::cout << "lr: " << learning_rate << std::endl;
+	// std::cout << "batchsize: " << batchsize << std::endl;
+	// std::cout << "num_batches: " << num_batches << std::endl;
+
+	cudaEvent_t start_memory;
+	cudaEvent_t stop_memory;
+
+	// Create the events
+	cudaEventCreate(&start_memory);
+	cudaEventCreate(&stop_memory);
 
 	// The number of threads we allocate per block
 	const int THREADS_PER_BLOCK = batchsize;
-
 
 	// Initialize data vector on host
 	thrust_host_float data_h(R * C);
@@ -99,6 +105,21 @@ int main(int argc, char **argv) {
 	batch_indices = ind_vector;
 //	print_vector(batch_indices, "batch_indices");
 
+
+	cudaEventRecord(stop_memory);
+	cudaEventSynchronize(stop_memory);
+	float miliseconds_memory = 0;
+	cudaEventElapsedTime(&miliseconds_memory, start_memory, stop_memory);
+	printf("Memory time = %f \n", miliseconds_memory);
+
+	cudaEvent_t start;
+	cudaEvent_t stop;
+
+	// Create the events
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+
+	// Get the first time	
 	// TODO: Put iterations in SGD_Step function
 	for (int epoch = 1; epoch <= MAX_EPOCHS; ++epoch) {
 		// We shuffle the data indexes before the start of each epoch
@@ -153,10 +174,10 @@ int main(int argc, char **argv) {
 					C);
 			// Reduce/sum the errors
 			float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
-			printf("epoch: %d\n", epoch);
+			// printf("epoch: %d\n", epoch);
 			// Print weights and squared error sum
-			print_vector(weights, "weights");
-			std::cout << "Squared error sum: " << sq_err_sum << std::endl;
+			// print_vector(weights, "weights");
+			// std::cout << "Squared error sum: " << sq_err_sum << std::endl;
 			//		print_matrix(gradients, "weight_gradients", R, C);
 		}
 	}
@@ -172,9 +193,22 @@ int main(int argc, char **argv) {
 			errors_raw_ptr,
 			R,
 			C);
-	// Reduce/sum the errors
+
+	//	float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
+	//	print_vector(weights, "final_weights");
+	//	std::cout << "Final squared error sum: " << sq_err_sum << std::endl;
+
+	// Print final quantities
 	float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
-	print_vector(weights, "final_weights");
-	std::cout << "Final squared error sum: " << sq_err_sum << std::endl;
+	std::cout << "Squared error sum: " << sq_err_sum << std::endl;
+	print_vector(weights, "weights");	
+	
+	// Get the second time
+	cudaEventRecord(stop);
+	cudaEventSynchronize(stop);
+	float miliseconds = 0;
+	cudaEventElapsedTime(&miliseconds, start, stop);
+	printf("kernel time = %f \n", miliseconds);
+
 	return 0;
 }
