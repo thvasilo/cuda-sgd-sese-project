@@ -52,14 +52,14 @@ __global__ void squared_errors(
 	const int C) {
 
 	int thread_index = blockIdx.x * blockDim.x + threadIdx.x;
-	int example_index = thread_index * C;
+	int linear_index = thread_index * C;
 	if (thread_index < R) {
 		float loss_derivative = squared_loss_derivative(
-				&data_array_d[example_index],
+				&data_array_d[linear_index],
 				&label_vector_d[thread_index],
 				weights_d,
 				C);
-		errors[thread_index] = loss_derivative * loss_derivative;
+		errors[thread_index] = loss_derivative * loss_derivative * 0.5;
 	}
 }
 
@@ -76,24 +76,31 @@ __global__ void calculate_gradients(
 	// We want each thread to take one "row" of the matrix and only modify that.
 
 	int thread_index = blockIdx.x * blockDim.x + threadIdx.x; // Should be row index
-	int example_index = thread_index * C;
+	//int example_index = thread_index * C;
 
 	// TODO: Vector operations should be done with cuBLAS using dynamic parallelism
 	if (thread_index < R) {
-		int example_index = batch_indices_d[thread_index] * C;
+		// Example index is the current example that we are examining in the batch, and is in [0, R_all-1], where R_all the total number
+		// data points
+		int example_index = batch_indices_d[thread_index];
+		// The linear index gives us the first element of the data array for the example in the interleaved array.
+		int linear_index = example_index * C;
 //		printf("thread idx: %d, example idx: %d\n", thread_index, example_index);
 		// Here we call squared_loss_derivative with the correct offsets, example_index for the data array
 		// and thread_index for the labels array
 		float loss_derivative = squared_loss_derivative(
-				&data_array_d[example_index],
-				&label_vector_d[thread_index],
+				&data_array_d[linear_index],
+				&label_vector_d[example_index],
 				weights_d,
 				C);
 		// Scale the gradient by the loss_derivative
 		for (int i = 0; i < C; ++i) {
 			// For linear models the gradient equals the features
-			gradients_d[example_index + i] = loss_derivative * data_array_d[example_index + i];
+//			printf("thread idx: %d, i: %d, gradient_index: %d\n", thread_index, i, i*R + thread_index);
+//			printf("thread idx: %d, loss derivative: %f\n", thread_index, loss_derivative);
+			gradients_d[i*R + thread_index] = loss_derivative * data_array_d[linear_index + i];
 		}
+//		printf("\n");
 	}
 }
 
