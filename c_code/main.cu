@@ -53,6 +53,8 @@ int main(int argc, char **argv) {
 	cudaEventCreate(&start_memory);
 	cudaEventCreate(&stop_memory);
 
+	// Start recording
+	cudaEventRecord(start_memory);
 	// The number of threads we allocate per block
 	const int THREADS_PER_BLOCK = batchsize;
 
@@ -105,7 +107,7 @@ int main(int argc, char **argv) {
 	batch_indices = ind_vector;
 //	print_vector(batch_indices, "batch_indices");
 
-
+	// Now measure the differences
 	cudaEventRecord(stop_memory);
 	cudaEventSynchronize(stop_memory);
 	float miliseconds_memory = 0;
@@ -118,7 +120,9 @@ int main(int argc, char **argv) {
 	// Create the events
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
-
+	
+	// Start measuring the event
+	cudaEventRecord(start);
 	// Get the first time	
 	// TODO: Put iterations in SGD_Step function
 	for (int epoch = 1; epoch <= MAX_EPOCHS; ++epoch) {
@@ -174,12 +178,13 @@ int main(int argc, char **argv) {
 					C);
 			// Reduce/sum the errors
 			float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
-			// printf("epoch: %d\n", epoch);
+			//printf("epoch: %d\n", epoch);
 			// Print weights and squared error sum
 			// print_vector(weights, "weights");
 			// std::cout << "Squared error sum: " << sq_err_sum << std::endl;
-			//		print_matrix(gradients, "weight_gradients", R, C);
+			// print_matrix(gradients, "weight_gradients", R, C);
 		}
+
 	}
 
 
