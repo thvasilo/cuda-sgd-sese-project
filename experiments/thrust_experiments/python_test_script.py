@@ -4,7 +4,6 @@ import csv
 import matplotlib.pyplot as plt
 import numpy as np
 
-
 # Set parameters
 cmd = './main'
 
@@ -15,7 +14,7 @@ dataset = name + '.csv'
 weights_file = name + '_weights' + '.csv'
 batch_size = 100
 R = 1000
-C = 4
+C = 3
 
 # Read the weights
 with open(weights_file, 'r') as f:

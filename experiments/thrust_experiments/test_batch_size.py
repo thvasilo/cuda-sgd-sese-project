@@ -8,16 +8,16 @@ import csv
 # Set parameters
 cmd = './main'
 
-learning_rate = 0.5
+learning_rate = 0.001
 iterations = 1000
-name = './data/python_data'
+name = './data/correct_prediction'
 dataset = name + '.csv'
 weights_file = name + '_weights' + '.csv'
 batch_size = 100
 R = 1000
-C = 4
+C = 3
 
-# Read the weights
+# Read the weightsbat
 with open(weights_file, 'r') as f:
     reader = csv.reader(f)
     for row in reader:
@@ -36,13 +36,11 @@ errors = []
 weights_collection = []
 kernel_times = []
 
-
 # Now we run the process
 for batch_size in batch_sizes:
     parameters = [learning_rate, iterations, dataset, R, C, batch_size]
     parameters = [str(par) for par in parameters]
-    run_line = [cmd]
-    run_line.extend(parameters)
+    run_line = [cmd] + parameters
     p = Popen(run_line, stdout=PIPE)
 
     # Get output per line
@@ -62,11 +60,25 @@ for batch_size in batch_sizes:
     weights = [float(w) for w in weights]
     weights_collection.append(np.asarray(weights))
 
-    kernel_time =  lines[3].split('=')
+    kernel_time = lines[3].split('=')
     kernel_times.append(kernel_time[1])
 
+
+# Transform to arrays the relevant quantities
+kernel_times = [float(t) for t in kernel_times]
+errors = np.asarray([float(e) for e in errors])
+weights_errors = [np.linalg.norm(true_weights - ws) for ws in weights_collection]
+
 # Plot everything
-# times = [float(t) for t in times]
-# plt.plot(batch_sizes, times)
+# plt.plot(batch_sizes, kernel_times)
 # plt.show()
+
+# Now plot everything
+plt.subplot(2, 1, 1)
+plt.title('weight_errors')
+plt.plot(batch_sizes, weights_errors, '*-')
+plt.subplot(2, 1, 2)
+plt.title('errors')
+plt.plot(batch_sizes, errors, '*-')
+plt.show()
 

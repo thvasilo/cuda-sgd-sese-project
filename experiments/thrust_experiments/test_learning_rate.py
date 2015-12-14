@@ -12,11 +12,12 @@ learning_rate = 0.5
 iterations = 1000
 name = './data/python_data3'
 name = './data/5xy'
+# name = './data/python_data'
 dataset = name + '.csv'
 weights_file = name + '_weights' + '.csv'
 batch_size = 5
-R = 40
-C = 1
+R = 1000
+C = 3
 
 # Read the weights
 with open(weights_file, 'r') as f:
@@ -37,7 +38,6 @@ times = []
 errors = []
 weights_collection = []
 kernel_times = []
-
 
 # Now we run the process
 for learning_rate in learning_rates:
