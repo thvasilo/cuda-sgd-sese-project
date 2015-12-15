@@ -41,6 +41,7 @@
 \usepackage[a4paper,margin=0.8in]{geometry}  %%Cambiar los margenes
 
 \newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+\newcommand{\Wb}{\mathbf{w}}
 
 %\usepackage{hyperref} %This should be loade after most of the other packages
 % \hypersetup{colorlinks=true}  %Para que los hiperlinks cuando se hagan referencias aparezcan en colores.
@@ -105,54 +106,58 @@ Parallelize this parallelize that.
 
 \section{Stochastic Gradient Descent}
 
+%TODO: (Throughout text) Ensure vectors are typed with \mathbf{v}, have \Wb command for w
+
 One of the most common problems in estimation, optimization theory and machine learning is
 minimizing an objective function \citep{bottou2010large}. Consider the \textit{loss} function $Q(z,
 w)$. This function depends both on a sample $z=(x, y)$ which is a pair made of an input $x$ and an
-output $y$ and on the vector $w$ which parametrizes the function that connects the input to the
-output. In such a context we will like to find the vector $w$ that minimizes this error averaged
-over the sample. In a more mathematical parlance we write that in the following statement:
+output $y$ and on the vector $\Wb$ which parametrizes the function that connects the input to the
+output. In such a context we would like to find the vector $\Wb$ that minimizes this error averaged
+over our data. In a more mathematical parlance we write that following:
 
 \begin{equation}
 E(w) = \frac{1}{n} \sum_{i=1}^n Q(z_i, w)
 \end{equation}
 
-Where the index $i$ insure that we go through all the samples $z_i$.
+where $i$ the sample index, as we go through the complete dataset $\mathbf{z}$.
 
-The Gradient Descent method proposes moving in the direction of the gradient in order to find $w$. That is, we do steps of a given size in the direction of the gradient of the loss function and update $w$ in consequence:
+The Gradient Descent method proposes moving in the direction of the gradient in order to
+find $w$. That is, we perform steps of a given size in the direction of the gradient of the loss function and update $w$ at every step:
 
 \begin{equation}
 w_{t + 1} = w_t - \gamma \sum_{i=1}^n \triangledown_w Q(z_i, w)
 \end{equation}
 
-Where $\gamma$ controls for step size. This quantity is usually called the learning rate and
-controls the speed or rate of change of in $w$. $gamma$ is of crucial importance for the
-convergence or divergence of the algorithm, if $gamma$ is to high we will overblown the step and
-will end walking too far away from our aim, if $gamma$ is to small we will do steps that are too
-small and we will, in practice, never arrive to our goal.
+where $\gamma$ controls the step size. This quantity is usually called the learning rate and
+controls the speed or rate of change in $w$. $gamma$ is of crucial importance for the
+convergence or divergence of the algorithm, setting $gamma$ too high leads to large changes at each iteration and
+making it possible for the algorithm to diverge. If we set $gamma$ too small the algorithm
+will not perform enough exploration, leading to slow convergence.
 
 Under sufficient regularity assumptions when the initial estimate of $w$ is close enough to the
 minimum and the learning rate is small enough this algorithm can achieve linear convergence
 \citep{dennis1996numerical}.
 
-Stochastic Gradient Descent (SGD) is a simplification of the scheme proposed above that is used
-when not all the data is available at the same time or when the data does not fit into memory. In
-this case the average over the sample space is put aside and instead we use only the local gradient
-to indicate the direction of movement:
+Stochastic Gradient Descent (SGD) is a variation of the scheme proposed above that can be used
+when the complete dataset is not available at runtime, e.g. in a streaming setting,
+or when the data does not fit into memory.
+In this case instead of taking the average gradient over the complete data we only use the local
+gradient taken from a single datapoint to calculate the direction of movement:
 
 \begin{equation}
 w_{t + 1} = w_t - \gamma  \triangledown_w Q(z_i, w)
 \end{equation}
 
 It follows from the algorithm that this optimization can be implemented online due to the fact that
-no memory is needed for the calculation. The convergence of stochastic gradient descent is granted
+very little memory is needed for the calculation. The convergence of stochastic gradient descent is granted
 in  some mild conditions when the learning rate $\gamma$ decreases over time in such a way that the
 series  indexed by them does not diverge \citep{bottou2010large}.
 
-In \citep{wilson2003general} it shown, perhaps counter-intuitively, that batch gradient descent has
+In \citep{wilson2003general} it is shown, perhaps counter-intuitively, that batch gradient descent has
 worse run-times and convergence characteristics when compared to stochastic gradient descent.
 
 Mini-batch stochastic gradient descent lies somewhere in the middle between these two algorithms.
-There, the optimization process if performed on small subsets of the complete dataset that are
+There, the optimization process is performed on small subsets of the complete dataset that are
 called \textit{batches}. At each step in the algorithm we choose a random subset of the data,
 calculate the gradient, and update the weights, based on the information we are able to get from
 the batch. The main advantage in speed for mini-batch SGD comes from the fact that instead of the
@@ -168,25 +173,25 @@ recht2011hogwild, dekel2012optimal}, and each comes with some advantages and dis
 these algorithms are mostly intended to be used in a distributed setting, but can however be
 adapted to function well in a highly parallel setting as well.
 
-The approach presented in \cite{zinkevich2010parallelized} is an intuitive parallel extension of
-SGD, where each processor solves a local SGD problem according using a random partition of the
+The approach presented in \citep{zinkevich2010parallelized} is an intuitive parallel extension of
+SGD, where each processor solves a local SGD problem using a random partition of the
 complete dataset, and the solutions from each processor are then communicated and averaged. This
 approach involves practically no communication between the processors during the optimization
-phase, which while beneficial in terms of network/communication costs, results in subpar
+phase. While this is beneficial in terms of network/communication costs, it results in subpar
 performance when it comes to the optimality of the solution.
 
 \cite{recht2011hogwild} also propose an asynchronous algorithm which is aimed at problems with
 sparse parameters, i.e. we assume that the cost function we are optimizing can be decomposed (to a
 degree). This property makes it possible for individual processors to work on different parts of
-$w$, and perform gradient descent using only a single parameter from the complete weight vector,
+$\Wb$, and perform gradient descent using only a single parameter from the complete weight vector,
 making it possible to atomically update that single parameter, in parallel with the other
 processors, without the need for locking the weight vector while one processor makes its updates.
-While this approach allow for fast iterations since each processor can work and update his part of
+While this approach allows for fast iterations since each processor can work and update his part of
 the solution independently from the others, it has the additional assumption of problem sparsity
 and the lack of communication between processors can often lead to diverging solutions
-\cite{dai2015analysis}.
+\citep{dai2015analysis}.
 
-\cite{dekel2012optimal} show a distributed mini-batch SGD approach which they claim is optimal in
+\cite{dekel2012optimal} show a distributed mini-batch SGD approach which they show is optimal in
 terms of the \textit{optimality gap} which they define as the difference between the loss given by
 the optimal weight vector $Q(z, w^*)$ and the approximation obtained by the algorithm, $Q(z,
 \bar{w})$. The algorithm proposed uses mini-batches to calculate approximate gradients for each
@@ -211,6 +216,8 @@ For this work we chose a variant of the algorithm described by \cite{dekel2012op
 		\item Update the weight vector according to the average gradient.
 	\end{enumerate}
 \end{enumerate}
+
+We can write the above more formally in algorithmic form:
 
 \begin{algorithm}
 	\DontPrintSemicolon % Some LaTeX compilers require you to use \dontprintsemicolon instead
@@ -250,13 +257,13 @@ the gradient calculation.
 \section{Implementation}
 In this section we discuss the implementation tools and libraries that were used in the project.
 
-\subsection{Cuda}
-The cuda plataform was developed around 2009 \citep{nickolls2008scalable} and since then it has
+\subsection{CUDA}
+The CUDA platform was developed around 2009 \citep{nickolls2008scalable} and since then it has
 allowed the research community to harness the power of GPU for computing processing and data
-crunching without requiring expertise on graphical programming. The cuda model is an extension of
-ansi C where certain operations are carried out in a thread basis on the GPU. In order to do so
-cuda provides a geometrical hierarchy that is composed of threads, blocks and grids. In this work
-we have use cuda through the Thrust library.
+crunching without requiring expertise on graphical programming. The CUDA model is an extension of
+ANSI C where certain operations are carried out in a thread basis on the GPU. In order to do so
+CUDA provides a geometrical hierarchy that is composed of threads, blocks and grids. In this work
+we have use CUDA through the Thrust library.
 
 \subsection{Thrust}
 Thrust is a parallel algorithms library aimed at increasing the productivity of programmers by
@@ -273,8 +280,8 @@ Furthermore Thrust provides a vector container with both host and device instanc
 Use of templates?
 
 \section{Results}
-In this section we will show results of our time measurments. In order to measure effectively we
-use the cuda functionality of events. The cuda event API is the standard to bypass the non-blocking
+In this section we will show results of our time measurements. In order to measure effectively we
+use the CUDA functionality of events. The CUDA event API is the standard to bypass the non-blocking
 nature of kernel calls. In our code we use a call to eventRecorder before and after the kernel and
 then measure this difference. This is the time that we are going to be showing in our results from
 now on.
