@@ -40,6 +40,12 @@ def create_data_set(n_samples, n_features, noise=0, filename='./test', seed=42):
     filename_data = filename + '.csv'
     filename_weights = filename + '_weights' + '.csv'
 
+    # Need to add as fail-safe in case w is dimension 1 
+    w = np.array(w)  # Transform to array
+    # Check if it is one dimensional
+    if w.ndim == 0:
+        w = w[..., np.newaxis]
+
     # Save data
     with open(filename_data, 'wb') as fp:
         a = csv.writer(fp, delimiter=',')
@@ -59,10 +65,10 @@ def usage():
 def main(argv):
     # Parameters
     n_samples = 10000
-    n_features = 10
+    n_features = 1
     noise = 0.0
     seed = 42
-    filename = './python_data3'
+    filename = './python_data'
 
     try:
         opts, args = getopt.getopt(
