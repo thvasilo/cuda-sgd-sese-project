@@ -17,7 +17,7 @@ cmd = './main'
 
 learning_rate = 0.01
 iterations = 1000
-name = './data/correct_prediction'
+name = './data/first_batch_test'
 dataset = name + '.csv'
 weights_file = name + '_weights' + '.csv'
 batch_size = 100
@@ -34,7 +34,7 @@ true_weights = [float(w) for w in true_weights]
 true_weights = np.asarray(true_weights)
         
 # Iterate over batch_sizes
-batch_sizes = np.arange(10, 100, 10)
+batch_sizes = np.arange(10, 100, 5)
 
 # Initialize list to store
 memory_times = []
@@ -83,6 +83,7 @@ format_to_save = '.pdf'
 frameon = False  # no background
 transparent = True
 dpi = 1200
+fontsize = 18
 
 # First the kernel time
 fig = plt.figure()
@@ -95,8 +96,16 @@ ax.set_title('Kernel time scaling')
 ax.set_xlabel('Batch size')
 ax.set_ylabel('Kernel time (ms)')
 
+# Change the font size
+axes = fig.get_axes()
+for ax in axes:
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+                 ax.get_xticklabels() + ax.get_yticklabels()):
+        item.set_fontsize(fontsize)
+
 name = 'kernel_time_batch_scaling'
 filename_to_save =  folder + name + format_to_save
+fig.tight_layout()
 fig.savefig(filename_to_save, frameon=frameon,
             transparent=transparent, dpi=dpi, bbox_indces='tight')
 plt.close(fig)
@@ -106,14 +115,22 @@ fig = plt.figure()
 ax = fig.add_subplot(111)
 ax.plot(batch_sizes, memory_times, '-o')
 ax.set_xlim(0, 100)
-ax.set_ylim(bottom=0, top=3.0)
+ax.set_ylim(bottom=0, top=4.0)
 
 ax.set_title('Memory time scaling')
 ax.set_xlabel('Batch size')
 ax.set_ylabel('Memory time (ms)')
 
+# Change the font size
+axes = fig.get_axes()
+for ax in axes:
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+                 ax.get_xticklabels() + ax.get_yticklabels()):
+        item.set_fontsize(fontsize)
+
 name = 'memory_time_batch_scaling'
 filename_to_save =  folder + name + format_to_save
+fig.tight_layout()
 fig.savefig(filename_to_save, frameon=frameon,
             transparent=transparent, dpi=dpi, bbox_indces='tight')
 plt.close(fig)
@@ -126,10 +143,19 @@ ax.set_xlim(0, 100)
 
 ax.set_title('Error as a function of batch sizes')
 ax.set_xlabel('Batch size')
-ax.set_ylabel('Errors')
+ax.set_ylabel('Average Error')
+
+# Change the font size
+axes = fig.get_axes()
+for ax in axes:
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+                 ax.get_xticklabels() + ax.get_yticklabels()):
+        item.set_fontsize(fontsize)
+
 
 name = 'errors_batch_scaling'
 filename_to_save =  folder + name + format_to_save
+fig.tight_layout()
 fig.savefig(filename_to_save, frameon=frameon,
             transparent=transparent, dpi=dpi, bbox_indces='tight')
 plt.close(fig)
@@ -142,10 +168,19 @@ ax.set_xlim(0, 100)
 
 ax.set_title('Weights prediction error')
 ax.set_xlabel('Batch size')
-ax.set_ylabel('Errors')
+ax.set_ylabel('Weight Error')
+
+# Change the font size
+axes = fig.get_axes()
+for ax in axes:
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+                 ax.get_xticklabels() + ax.get_yticklabels()):
+        item.set_fontsize(fontsize)
 
 name = 'weights_errors_batch_scaling'
 filename_to_save =  folder + name + format_to_save
+
+fig.tight_layout()
 fig.savefig(filename_to_save, frameon=frameon,
             transparent=transparent, dpi=dpi, bbox_indces='tight')
 plt.close(fig)

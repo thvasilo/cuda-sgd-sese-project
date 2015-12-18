@@ -58,13 +58,14 @@ def create_scalable_data_sets(n_samples, n_features, data_subsets_sizes,
 def main():
     
     # Parameters
-    n_samples = 1000
+    n_samples = 1500
     n_features = 10
     noise = 0.0
     seed = 42
 
     jump = 100
-    data_subsets_sizes = np.arange(jump, n_samples+ jump, jump)
+    start = 500
+    data_subsets_sizes = np.arange(start, n_samples+ jump, jump)
     filename = './scalable_test'
 
     create_scalable_data_sets(n_samples, n_features,

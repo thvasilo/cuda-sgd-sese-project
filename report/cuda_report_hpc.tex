@@ -281,11 +281,20 @@ Use of templates?
 
 \section{Results}
 In this section we will show results of our time measurements. In order to measure effectively we
-use the CUDA functionality of events. The CUDA event API is the standard to bypass the non-blocking
-nature of kernel calls. In our code we use a call to eventRecorder before and after the kernel and
-then measure this difference. This is the time that we are going to be showing in our results from
-now on.
+use the CUDA functionality of events. The CUDA event API is the standard and recommended way to 
+bypass the non-blocking  nature of the kernel calls. 
+In particular we time two relevant events, first we created an event recorder to 
+register the time that it takes for the program to go through the memory transfers 
+and allocations, we call this \textbf{memory time.}. Second, we created another event
+recorder that takes care of measuring the execution time of the kernel, naturally we 
+call this the \textbf{kernel time}. In the following we will be interested in how our 
+algorithm scales with the size of the batch, the number of samples and the number 
+of features (dimensions) that our data possesses. For further and easy 
+reference we resume this parameters of interests in table \ref{table:parameters}.
 
+
+\begin{table}[H]
+\centering
 \begin{tabular}{|c|c|c|}
 \hline
 Parameter & Description & Range \\
@@ -297,6 +306,64 @@ Number of Samples & The number of training examples & • \\
 Number of Features & The number of features of each training point & • \\
 \hline
 \end{tabular}
+\caption{Main parameters for scalability testing}
+\label{table:parameters}
+\end{table}
+
+\subsection{Batch Size Scaling}
+
+First we tested how our algorithm scales with the size of batch. In figure \ref{fig:test_batch_size_kernel} we present the variation of the kernel time (in milliseconds) with respect to the batch size. We can appreciate that the time it takes to go through the whole operation diminishes as the batch becomes bigger. A hypothesis to explain this behavior is that with a fixed number of samples the time that it takes to go through the whole process is less if we cover more of the data with each batch. In figure \ref{fig:test_batch_size_memory} we can see, as we expect, that the amount of time to load the data and do the data transfers is more or less independent of the batch size. 
+
+\begin{figure}[H]
+\minipage{0.49\textwidth}
+	\centering
+  \includegraphics[width=\linewidth]{kernel_time_batch_scaling.pdf}
+  \caption{Kernel time as a function of batch size. Here the we used $1000$ samples with $3$ features. The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs. }
+  \label{fig:test_batch_size_kernel}
+\endminipage
+\hfill
+\minipage{0.49\textwidth}
+  \includegraphics[width=\linewidth]{memory_time_batch_scaling.pdf}
+  \caption{Memory time as a function of batch size. Here the we used $1000$ samples with $3$ features. The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs.}
+  \label{fig:test_batch_size_memory}
+\endminipage
+\end{figure}
+
+In order to do some sanity testing we also analyzed how the error of the algorithm 
+converged with both. We first calculated the \textbf{average error} over all the points, 
+this allowed us to have a measure of how well the algorithm is predicting the data. 
+As an additional measure given that we have access to the underlying model we know the 
+ground truth. With this in our hands we can as well calculate the difference between 
+the truth weights or coefficients that were used to generate the data and the ones that
+the model estimates. We call this the \textbf{weight error}. In figure
+\ref{fig:test_batch_size_error} we show how for this particular experiment the
+error evolves as a function of the batch size. We note that the variation of the errors
+are very small and therefore can claim that at least the algorithm is showing consistent
+results independently of the batch size. Going further in figure 
+\ref{fig:test_batch_size_werror} we show the the weights that the model is predicting
+approximately very well the ground truth (small weight errors) so we know that at least
+for this run the model is both consistent and accurate. 
+
+\begin{figure}[H]
+\minipage{0.49\textwidth}
+	\centering
+  \includegraphics[width=\linewidth]{errors_batch_scaling.pdf}
+  \caption{Average error as a function of the batch size. Here the we used $1000$ samples with $3$ features. The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs.}
+  \label{fig:test_batch_size_error}
+\endminipage
+\hfill
+\minipage{0.49\textwidth}
+  \includegraphics[width=\linewidth]{weights_errors_batch_scaling.pdf}
+  \caption{Weight errors as a function of batch size. Here the we used $1000$ samples with $3$ features. The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs.}
+  \label{fig:test_batch_size_werror}
+\endminipage
+\end{figure}
+
+\subsection{Number of Samples}
+
+
+\subsection{Number of Features}
+
 
 \section{Discussion}
 
