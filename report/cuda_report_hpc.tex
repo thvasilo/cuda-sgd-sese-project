@@ -206,14 +206,17 @@ factor is limited by the minimum of number of batches and available processors.
 \subsection{Algorithm Used}
 
 For this work we chose a variant of the algorithm described by \cite{dekel2012optimal}, which involves the following steps:
-%TODO: Write in algorithm format
+
 \begin{enumerate}
 	\item  	For each iteration:
 	\begin{enumerate}
-		\item Select a subset of the data of size $b$.
-		\item Calculate the gradient for each data point in the batch.
-		\item Sum and average the gradients for all data points in the batch.
-		\item Update the weight vector according to the average gradient.
+		\item Shuffle the dataset, and split into batches of size $b$.
+		\item For each batch in the dataset:
+		\begin{enumerate}
+			\item Calculate the gradient for each data point in the batch.
+			\item Sum and average the gradients for all data points in the batch.
+			\item Update the weight vector according to the average gradient.
+		\end{enumerate}
 	\end{enumerate}
 \end{enumerate}
 
@@ -221,25 +224,27 @@ We can write the above more formally in algorithmic form:
 
 \begin{algorithm}
 	\DontPrintSemicolon % Some LaTeX compilers require you to use \dontprintsemicolon instead
-	\KwIn{A dataset $D$ of containing n $z=(x, y)$ items, initial learning rate $\alpha$}
+	\KwIn{A dataset $\mathbf{D}$ of containing n $z=(x, y)$ items, initial learning rate $\alpha$, number of epochs $T$, batch size $b$}
 	\KwOut{A vector of weights providing an approximate linear solution}
 	Initialize $w$\;
 	\For{$i \gets 1$ \textbf{to} $T$} {
-		Select a random subset of $D$, $\mathbf{z}_s$\;
-		\For(\textbf{parallel}){$j \gets 1$ \textbf{to} $b$} {
-			$\hat{g_j} = \triangledown_w Q(z_j, w_i)$, where $z_j \in \mathbf{z}_s$\;
+		Shuffle the dataset, and split into $n/b$ batches\;
+		\For{batch $\mathbf{z}_s$ over $\mathbf{D}$} {
+			\For(\textbf{parallel}){$j \gets 1$ \textbf{to} $b$} {
+				$\hat{g_j} = \triangledown_w Q(z_j, w_i)$, where $z_j \in \mathbf{z}_s$\;
+			}
+			$\gamma = -(\alpha / \sqrt{i}))$\;
+			Do parallel sum $\sum_j{\hat{g_j}}$ to compute the average gradient for the current batch, $\bar{g_i} = 1/j \sum_j{\hat{g_j}}$\;
+			Do parallel scaling of the weight vector: $w_{i + 1} = w_i - \gamma \,  \bar{g_i}$\;
 		}
-		$\gamma = -(\alpha / \sqrt{i}))$\;
-		Do parallel sum $\sum_j{\hat{g_j}}$ to compute the average gradient for the current batch, $\bar{g_i} = 1/j \sum_j{\hat{g_j}}$\;
-		Do parallel scaling of the weight vector: $w_{i + 1} = w_i - \gamma \,  \bar{g_i}$\;
-
 	}
 	\Return{$w_T$}\;
 	\caption{Mini-batch parallel SGD on a GPU}
 	\label{algo:sgd-gpu}
 \end{algorithm}
 
-The difference of this algorithm when compared to the one by \cite{dekel2012optimal} is that where
+This algorithm has two differences compared to the one by \cite{dekel2012optimal}.
+The first one is that where
 they sum the gradients over all batches in order to reduce communication costs --the algorithm is
 aimed at a distributed environment-- we are able to sum the gradient for the sample \textit{within}
 each batch. We are able to do this due to the low communication costs that we have once all the
@@ -247,6 +252,11 @@ data is loaded to the GPU, and using this approach we able to tie the paralleliz
 size of the mini-batch $b$ instead of the number of batches $c$. Depending on the data size and
 parameters, it usually true that $b \gg c$, allowing for better utilization of the GPU
 architecture.
+The second difference is that where they take a random subset of the data at each iteration,
+we have the assumption that the dataset will fit into the memory of the GPU, which allows us
+to use the more traditional \textit{epochs} to train. An epoch is one pass over the complete
+dataset, and by shuffling the dataset at the beginning of each epoch we are able to get better
+convergence behavior as shown in \cite{bottou2010large}.
 
 We employ parallelization then in 3 distinct parts of the algorithm: We calculate the gradients for
 each sample in a batch in parallel, we sum the gradients in parallel through a transform/reduce
@@ -269,17 +279,17 @@ we have use CUDA through the Thrust library.
 Thrust is a parallel algorithms library aimed at increasing the productivity of programmers by
 offering a model of programming similar to the one of the standard library on C++
 \citep{bell2012thrust}. In other words this switches the attention from \textit{how} to compute
-something to simply \textit{what} to compute. Among the most notorious features that
-\textbf{Thrust} provides are parallel version of scan, sort and reduction which allow us to use
-utilize those functions with arbitrary types and operations.
+something to simply \textit{what} to compute. Among the notable features that
+\textbf{Thrust} provides are parallel versions of scan, sort and reductions on vectors which allow us
+to utilize those functions with arbitrary types and operations.
 
-Furthermore Thrust provides a vector container with both host and device instances that allow us to demarcate where the operations are happening and takes care of the memory transfers.
+Furthermore Thrust provides a vector container with both host and device implementations that allow us
+to use common STL operations, specific Thrust operations like reduce, and provides memory safety
+within the Thrust library.
 
-
-\subsection{C+11}
-Use of templates?
 
 \section{Results}
+
 In this section we will show results of our time measurements. In order to measure effectively we
 use the CUDA functionality of events. The CUDA event API is the standard and recommended way to 
 bypass the non-blocking  nature of the kernel calls. 
