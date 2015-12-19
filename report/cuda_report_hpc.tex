@@ -289,8 +289,8 @@ and allocations, we call this \textbf{memory time.}. Second, we created another 
 recorder that takes care of measuring the execution time of the kernel, naturally we 
 call this the \textbf{kernel time}. In the following we will be interested in how our 
 algorithm scales with the size of the batch, the number of samples and the number 
-of features (dimensions) that our data possesses. For further and easy 
-reference we resume this parameters of interests in table \ref{table:parameters}.
+of features (dimensions) that our data possesses. For easy 
+reference we present these parameters of interest in Table \ref{table:parameters}.
 
 
 \begin{table}[H]
@@ -316,24 +316,27 @@ generate our own artificial data sets. This ensures reproducibility with enough
 variability and furthermore consistent access to the ground truth and 
 we ensure control over $N_s$ and $N_f$ to test how our algorithm scales. 
 
-In order to generate experiments that scale correctly with different
-data set sizes we used a reduction mechanisms for the bigger data set. 
-That is  we first build a data set with the maximum data size that we want to 
-try and then reduce it by taking pieces of arbitrary data sizes. This allowed us
-to test in the same data for different sample sizes.
+In order to generate experiments that scale consistently  with different
+data set sizes we used subsets from a bigger data set. 
+That is, we first build a data set with the maximum data size that we want to 
+test and then reduce it by taking pieces of arbitrary data sizes. This ensures
+that the convergence characteristics of the dataset --or ``difficulty'' to learn--
+should be consistent across the differently sized datasets, since they originate
+from the same generating process.
 
 \subsection{Batch Size Scaling}
 
-First we tested how our algorithm scales with the size of batch. 
-In figure \ref{fig:test_batch_size_kernel} we present the variation 
+We first tested how our algorithm scales with the size of batch. 
+In Figure \ref{fig:test_batch_size_kernel} we present the variation 
 of the kernel time (in milliseconds) with respect to the batch size. 
-We can appreciate that the time it takes to go through the whole operation 
-diminishes as the batch becomes bigger. A hypothesis to explain this behavior 
-is that with a fixed number of samples the time that it takes to go through the 
-whole process is less if we cover more of the data with each batch. 
-In figure \ref{fig:test_batch_size_memory} we can see, as we expect, 
-that the amount of time to load the data and do the data transfers is 
-more or less independent of the batch size. 
+We can see that the time it takes to go through the whole operation 
+diminishes as the batch becomes bigger. This is expected as our parallelism
+unit is the size of the batch, the larger the batchsize, the more threads
+are launched in parallel, making the runtime for each epoch (one pass through the
+complete dataset) smaller. 
+In Figure \ref{fig:test_batch_size_memory} we can see, as we expect, 
+that the amount of time to load the data from disk and transfer to the GPU is 
+independent of the batch size. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Kernel and Memory time for batch size
@@ -353,20 +356,22 @@ more or less independent of the batch size.
 \endminipage
 \end{figure}
 
-In order to do some sanity testing we also analyzed how the error of the algorithm 
-converged with both. We first calculated the \textbf{average error} over all the points, 
+We analyze the accuracy of the algorithm by looking at its performance in terms
+of error on the dataset, and how well it was able to approximate the true weights
+of the generating process.
+We first calculated the \textbf{sum of squared errors} over all the data points, 
 this allowed us to have a measure of how well the algorithm is predicting the data. 
-As an additional measure given that we have access to the underlying model we know the 
-ground truth. With this in our hands we can as well calculate the difference between 
-the truth weights or coefficients that were used to generate the data and the ones that
-the model estimates. We call this the \textbf{weight error}. In figure
+As an alternative view, given that we have access to the underlying model we know the 
+ground truth  for the weight, which allows us to calculate the difference between 
+the true weights or coefficients that were used to generate the data and the ones that
+the model estimates. We call this the \textbf{weight error}. In Figure
 \ref{fig:test_batch_size_error} we show how for this particular experiment the
 error evolves as a function of the batch size. We note that the variation of the errors
-are very small and therefore can claim that at least the algorithm is showing consistent
-results independently of the batch size. Going further in figure 
-\ref{fig:test_batch_size_werror} we show the the weights that the model is predicting
-approximately very well the ground truth (small weight errors) so we know that at least
-for this run the model is both consistent and accurate. 
+is very small and therefore we can claim that at least the algorithm is showing consistent
+results independently of the batch size for this dataset. Going further in Figure 
+\ref{fig:test_batch_size_werror} we show that the weights the model is predicting
+approximate very well the ground truth which means that at least
+for this dataset the algorithm is both consistent and accurate. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Errors for batch size 
@@ -386,15 +391,17 @@ for this run the model is both consistent and accurate.
 \endminipage
 \end{figure}
 
-We also tested what happens with this whole behavior when we increase the number of
-training samples ($N_s$). In figure \ref{fig:batch_size_scaling_kernel} we show 
-how the kernel time decreases for different values of the $N_s$, 
-we can appreciate that the there is an increase in the kernel time with the 
-number of samples as expected but that the overall behavior is the same. 
-Furthermore it is interesting to note that the increases in kernel 
-time for different number of samples is far more marked for small batch sizes. 
+We also tested how the algorithm behaves when we increase the number of
+training samples ($N_s$). In Figure \ref{fig:batch_size_scaling_kernel} we show 
+how the kernel time scales for different values of $N_s$. 
+We can observe that the there is an increase in the kernel time with the 
+number of samples as expected, but that the overall scaling behavior is the same. 
+The batchsize-bound parallelism is evident here as well, as we observe that the increases in kernel 
+time for different number of samples are more pronounced for small batch sizes. 
 
-We illustrate memory time behavior in figure \ref{fig:batch_size_scaling_memory}. We note that there is not big variation in the time that it takes to load and transfer the data at this scale. In addition the whole dynamic is consistent with the situation described previously. 
+We illustrate memory time behavior in Figure \ref{fig:batch_size_scaling_memory}. Again, 
+we note that there is no variation in the time that it takes to load and transfer the 
+data at this scale, as shown previously.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Number of samples scaling for batch size
