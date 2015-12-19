@@ -280,12 +280,15 @@ Thrust is a parallel algorithms library aimed at increasing the productivity of 
 offering a model of programming similar to the one of the standard library on C++
 \citep{bell2012thrust}. In other words this switches the attention from \textit{how} to compute
 something to simply \textit{what} to compute. Among the notable features that
-\textbf{Thrust} provides are parallel versions of scan, sort and reductions on vectors which allow us
+Thrust provides are parallel versions of scan, sort and reductions on vectors which allow us
 to utilize those functions with arbitrary types and operations.
 
 Furthermore Thrust provides a vector container with both host and device implementations that allow us
 to use common STL operations, specific Thrust operations like reduce, and provides memory safety
 within the Thrust library.
+
+We make use of Thrust vectors in order to store all the matrices and vectors we use
+in our implementation, and use operations like \texttt{transform}, \texttt{reduce} and \texttt{reduce\_by\_key} in order to apply SAXPY operations, vector scaling, and sums.
 
 
 \section{Results}
@@ -440,6 +443,55 @@ data at this scale, as shown previously.
 
 
 \section{Discussion}
+
+The runtime and scaling characteristics that we observed in our experiments are
+consistent with our expectations, given the unit of parallelism being tied to the
+batch. While parallelization in the order of tens to hundreds of threads, which
+is what this unit of parallelism can give us, is acceptable for CPU parallel
+programming, the same is not true for GPUs.
+
+In our initial testing we implemented batch (not mini-batch) gradient descent
+on the GPU, where we loaded all the data points in the dataset at once, leading
+to potentially better parallelism. However since this approach is highly limited
+by the amount of memory on the GPU we chose to use mini-batches instead.
+
+The choice of using the batch size as the unit of parallelism was made mostly due to
+time constraints, we realize that it is suboptimal and we have the following suggestions
+on how to improve the current implementation:
+
+\begin{enumerate}
+	\item \textbf{Dynamic Parallelism - cuBLAS for vector operations}
+	
+	SGD involves a number of vector operations, mostly dot products.
+	In the current implementation these are done sequentially through \texttt{for} loops within kernels.
+	By using dynamic parallelism and specifically cuBLAS operations
+	we can significantly speed up these computations.
+	
+	
+	\item \textbf{Sequential memory access}
+	
+	In SGD one commonly shuffles the dataset in memory before each iteration, as it has been shown to improve
+	convergence performance. In the current implementation we emulate this shuffling by randomizing the
+	order in which we access elements of the dataset, leading to non-sequential memory 
+	accesses. What we could do instead is to shuffle the data on the GPU memory and perform 
+	sequential memory accesses.
+	
+	\item \textbf{Change parallelism unit}
+	
+	Perhaps most importantly, in the current implementation our unit of parallelization is the size of the batch; we run one batch 
+	at a time and parallelize
+	the computations in terms of the data points within the batch. Common batch sizes range from 10 - 1000
+	making this way to parallelize highly inefficient on the GPU, even if dynamic parallelism is employed.
+	We could change the parallelism scheme of the algorithm so we can run multiple
+	batches in parallel, thereby greatly increasing the parallelism and achieving much 
+	higher occupancy on the GPU.
+\end{enumerate}
+
+During the course of this project we learned a lot about using CUDA and Thrust, and had
+to deal with a number of development issues that are common in non-managed memory 
+languages like C and C++, a hurdle that was amplified by the need to perform remote
+debugging. Despite the cost of development ease however, we also realized the tremendous potential of GPUs for speeding up scientific computations, and will definitely be
+using the knowledge we gained by the summer school and this project in our own research.
 
 \bibliographystyle{plainnat}
 \bibliography{references}
