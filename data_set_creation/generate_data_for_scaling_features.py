@@ -22,15 +22,15 @@ def generate_data_for_features(n_samples, vector_of_number_of_features, noise=0,
     """
 
     for n_features in vector_of_number_of_features:
-        filename += str(n_features)
-        create_data_set(n_samples, n_features, noise, filename, seed)
+        name = filename + str(n_features)
+        create_data_set(n_samples, n_features, noise, name, seed)
         
 
 def main():
-    n_samples = 10
+    n_samples = 10000
     noise = 0.0
-    filename = './test_features_scalability'
-    feature_vector = np.arange(2, 11, 1)
+    filename = './features_scalability'
+    feature_vector = np.arange(2, 16, 1)
 
     # Call the function
     generate_data_for_features(n_samples, feature_vector, noise, filename)

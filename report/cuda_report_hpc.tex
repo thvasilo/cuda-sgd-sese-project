@@ -488,8 +488,46 @@ In order to do the same sanity check that we did for the batch size scaling we s
 \end{figure}
 
 \subsection{Number of Features}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Number of features scaling
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Explanation.
+
+\begin{figure}[H]
+\minipage{0.49\textwidth}
+	\centering
+  \includegraphics[width=\linewidth]{kernel_time_n_features.pdf}
+  \caption{Kernel time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \label{fig:n_features_kernel}
+\endminipage
+\hfill
+\minipage{0.49\textwidth}
+  \includegraphics[width=\linewidth]{memory_time_n_features.pdf}
+  \caption{Memory time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \label{fig:n_features_memory}
+\endminipage
+\end{figure}
 
 
+Explanation.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Number of samples errors
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}[H]
+\minipage{0.49\textwidth}
+	\centering
+  \includegraphics[width=\linewidth]{errors_n_features.pdf}
+  \caption{Kernel time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \label{fig:n_features_error}
+\endminipage
+\hfill
+\minipage{0.49\textwidth}
+  \includegraphics[width=\linewidth]{weights_errors_n_features.pdf}
+  \caption{Memory time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \label{fig:n_features_weights_error}
+\endminipage
+\end{figure}
 \section{Discussion}
 
 The runtime and scaling characteristics that we observed in our experiments are
