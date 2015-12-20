@@ -94,19 +94,23 @@ Authors: Ram\'on  Mart\'inez, Theodoros Vasiloudis   \\
 PDC Center for High Performance Computing}\\ [1.0cm]
 \includegraphics[width=0.15\textwidth]{KTH_black.png}\\[1.5cm] % Controls the distance till the new object
 % Bottom of the page
-{\large 15 September of 2015}
+{\large \today}
 
 \end{center}
 \end{titlepage}
 
 \begin{abstract}
-Parallelize this parallelize that.
+For this project we implemented a parallel version of the mini-batch
+Stochastic Gradient Descent optimization algorithm on the GPU, using
+CUDA and the Thrust library. We performed a number of experiments
+examining the scaling and accuracy characteristics of the implementation
+on synthetic data, and report the results along with our interpretation
+and conclusions.
 
 \end{abstract}
 
 \section{Stochastic Gradient Descent}
 
-%TODO: (Throughout text) Ensure vectors are typed with \mathbf{v}, have \Wb command for w
 
 One of the most common problems in estimation, optimization theory and machine learning is
 minimizing an objective function \citep{bottou2010large}. Consider the \textit{loss} function $Q(z,
@@ -358,13 +362,13 @@ independent of the batch size.
 \minipage{0.49\textwidth}
 	\centering
   \includegraphics[width=\linewidth]{kernel_time_batch_scaling.pdf}
-  \caption{Kernel time as a function of batch size. Here the we used $1000$ samples ($N_s=1000) $ with $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \caption{Kernel time as a function of batch size. Here the we used $1000$ samples ($N_s=1000) $ with $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data shown here is for $1000$ iterations.}
   \label{fig:test_batch_size_kernel}
 \endminipage
 \hfill
 \minipage{0.49\textwidth}
   \includegraphics[width=\linewidth]{memory_time_batch_scaling.pdf}
-  \caption{Kernel time as a function of batch size. Here the we used $1000$ samples ($N_s=1000) $ with $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \caption{Kernel time as a function of batch size. Here the we used $1000$ samples ($N_s=1000) $ with $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data shown here is for $1000$ iterations.}
   \label{fig:test_batch_size_memory}
 \endminipage
 \end{figure}
@@ -393,13 +397,13 @@ for this dataset the algorithm is both consistent and accurate.
 \minipage{0.49\textwidth}
 	\centering
   \includegraphics[width=\linewidth]{errors_batch_scaling.pdf}
-  \caption{Average error as a function of the batch size. Here the we used $1000$ samples ($N_s=1000$) with $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations}
+  \caption{Average error as a function of the batch size. Here the we used $1000$ samples ($N_s=1000$) with $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data shown here is for $1000$ iterations}
   \label{fig:test_batch_size_error}
 \endminipage
 \hfill
 \minipage{0.49\textwidth}
   \includegraphics[width=\linewidth]{weights_errors_batch_scaling.pdf}
-  \caption{Weight errors as a function of batch size. Here the we used $1000$ samples ($N_s=1000) $ with $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations}
+  \caption{Weight errors as a function of batch size. Here the we used $1000$ samples ($N_s=1000) $ with $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data shown here is for $1000$ iterations}
   \label{fig:test_batch_size_werror}
 \endminipage
 \end{figure}
@@ -426,13 +430,13 @@ there is an effect on it as we increase the quantity of data to load.
 \minipage{0.49\textwidth}
 	\centering
   \includegraphics[width=\linewidth]{batch_size_scaling_kernel.pdf}
-  \caption{Kernel time as a function of batch size for different sample sizes. Here we used sample sizes ($N_s$) of $1000$, $2000$ and $3000$. Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \caption{Kernel time as a function of batch size for different sample sizes. Here we used sample sizes ($N_s$) of $1000$, $2000$ and $3000$. Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data shown here is for $1000$ iterations.}
   \label{fig:batch_size_scaling_kernel}
 \endminipage
 \hfill
 \minipage{0.49\textwidth}
   \includegraphics[width=\linewidth]{batch_size_scaling_memory.pdf}
-  \caption{Kernel time as a function of batch size for different sample sizes. Here we used sample sizes ($N_s$) of $1000$, $2000$ and $3000$. Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \caption{Kernel time as a function of batch size for different sample sizes. Here we used sample sizes ($N_s$) of $1000$, $2000$ and $3000$. Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data shown here is for $1000$ iterations.}
   \label{fig:batch_size_scaling_memory}
 \endminipage
 \end{figure}
@@ -456,18 +460,18 @@ the more chaotic but still linear increase of the memory time as function of the
 \minipage{0.49\textwidth}
 	\centering
   \includegraphics[width=\linewidth]{kernel_time_n_samples.pdf}
-  \caption{Kernel time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \caption{Kernel time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data shown here is for $1000$ iterations.}
   \label{fig:n_samples_kernel}
 \endminipage
 \hfill
 \minipage{0.49\textwidth}
   \includegraphics[width=\linewidth]{memory_time_n_samples.pdf}
-  \caption{Memory time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \caption{Memory time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data shown here is for $1000$ iterations.}
   \label{fig:n_samples_memory}
 \endminipage
 \end{figure}
 
-In order to do the same sanity check that we did for the batch size scaling we show here how the sum of the squared errors and the weight error changed as a function of the sample size. We present those in figure \ref{fig:n_samples_error} and figure \ref{fig:n_samples_weights_error}. We see a small increase in the errors because the sum is not averaged so every time we add a term we contribute a little bit to this factor, even if the overall magnitude is still small. The weights errors on the other hand are surprisingly consistent which reflect the fact the algorithm converges quite certainly for this particular data set.   
+In order to do the same sanity check that we did for the batch size scaling we show here how the sum of the squared errors and the weight error changed as a function of the sample size. We present those in Figure \ref{fig:n_samples_error} and Figure \ref{fig:n_samples_weights_error}. We see a small increase in the errors because the sum is not averaged so every time we add a term we contribute a little bit to this factor, even if the overall magnitude is still small. The weights errors on the other hand are surprisingly consistent which reflect the fact the algorithm converges quite certainly for this particular data set.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Number of samples errors
@@ -476,13 +480,13 @@ In order to do the same sanity check that we did for the batch size scaling we s
 \minipage{0.49\textwidth}
 	\centering
   \includegraphics[width=\linewidth]{errors_n_samples.pdf}
-  \caption{Kernel time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \caption{SSE as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data shown here is for $1000$ iterations.}
   \label{fig:n_samples_error}
 \endminipage
 \hfill
 \minipage{0.49\textwidth}
   \includegraphics[width=\linewidth]{weights_errors_n_samples.pdf}
-  \caption{Memory time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \caption{Weight errors as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data shown here is for $1000$ iterations.}
   \label{fig:n_samples_weights_error}
 \endminipage
 \end{figure}
@@ -492,42 +496,55 @@ In order to do the same sanity check that we did for the batch size scaling we s
 % Number of features scaling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-Explanation.
+We also examined the accuracy and scaling of the implementation in terms of the number
+of features ($N_f$). In terms of runtime scaling we observe a linear increase as we
+increase the features. This behavior can be explained from the fact that the number of
+features mostly affect the vector operations (dot product)
+that are done in the gradient calculation, which are done sequentially within each kernel.
+As we increase the features, we are adding more work that is not parallelized, thereby
+increasing the runtime. The increase in memory time can be explained by the increase in data
+size that comes with more features.
 
 \begin{figure}[H]
 \minipage{0.49\textwidth}
 	\centering
   \includegraphics[width=\linewidth]{kernel_time_n_features.pdf}
-  \caption{Kernel time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \caption{Kernel time as a function of $N_f$. Here we used a batch size of $100$. Furthermore we used $10000$ samples ($N_s=10000$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data shown here is for $1000$ iterations.}
   \label{fig:n_features_kernel}
 \endminipage
 \hfill
 \minipage{0.49\textwidth}
   \includegraphics[width=\linewidth]{memory_time_n_features.pdf}
-  \caption{Memory time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \caption{Memory time as a function of $N_f$. Here we used a batch size of $100$. Furthermore we used $10000$ samples ($N_s=10000$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data shown here is for $1000$ iterations.}
   \label{fig:n_features_memory}
 \endminipage
 \end{figure}
 
 
-Explanation.
+In terms of accuracy, we observe an increasing trend both in terms of SSE and weight
+error. This can be explained from the fact that the optimization problem becomes increasingly
+more difficult in higher dimensions, leading to worse approximations. We also observed
+a significant increase in the scale of SSE (5-25) compared to the previous experiments,
+which we cannot adequately explain, and could be an experimental artifact.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Number of samples errors
+% Number of features errors
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{figure}[H]
 \minipage{0.49\textwidth}
 	\centering
   \includegraphics[width=\linewidth]{errors_n_features.pdf}
-  \caption{Kernel time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \caption{SSE as a function of $N_f$. Here we used a batch size of $100$. Furthermore we used $10000$ samples ($N_s=10000$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data shown here is for $1000$ iterations.}
   \label{fig:n_features_error}
 \endminipage
 \hfill
 \minipage{0.49\textwidth}
   \includegraphics[width=\linewidth]{weights_errors_n_features.pdf}
-  \caption{Memory time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \caption{Weight errors as a function of $N_f$. Here we used a batch size of $100$. Furthermore we used $10000$ samples ($N_s=10000$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data shown here is for $1000$ iterations.}
   \label{fig:n_features_weights_error}
 \endminipage
 \end{figure}
+
 \section{Discussion}
 
 The runtime and scaling characteristics that we observed in our experiments are
