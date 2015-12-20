@@ -58,7 +58,8 @@ data_subsets_sizes = np.arange(start, n_samples + jump, jump)
 
 for R in data_subsets_sizes:
     name = base_name + str(R)
-    print(name)
+    dataset = name + '.csv'
+    print(dataset)
 
     # Initialize list to store
     memory_times = []
@@ -130,7 +131,7 @@ plt.close(fig1)
 
 # Now customize the plot2 memory times
 ax2.set_xlim(0, 100)
-ax2.set_ylim(bottom=0, top=4.0)
+ax2.set_ylim(bottom=0, top=10.0)
 ax2.legend()
 
 ax2.set_title('Memory time scaling')

@@ -414,7 +414,8 @@ time for different number of samples are more pronounced for small batch sizes.
 
 We illustrate memory time behavior in Figure \ref{fig:batch_size_scaling_memory}. Again, 
 we note that there is no variation in the time that it takes to load and transfer the 
-data at this scale, as shown previously.
+data at this scale, as shown previously. However there as we could expect 
+there is an effect on it as we increase the quantity of data to load. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Number of samples scaling for batch size
@@ -438,6 +439,53 @@ data at this scale, as shown previously.
 
 \subsection{Number of Samples}
 
+In order to test how exactly our algorithm scales with the number of samples 
+of the data set ($N_s$) we calculated the kernel time for different subsets 
+size of a particular data set. As described in the experiments sections we did
+this in order to make the comparison that would change less context. The results
+of this are illustrated in figure \ref{fig:n_samples_kernel} where we can appreciate
+a linear increase with the sample size. We repeated the process for 
+the memory time and we illustrate the results of this experiments 
+in figure \ref{fig:n_samples_memory}. In it we can appreciate 
+the more chaotic but still linear increase of the memory time as function of the sample size. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Number of samples scaling 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}[H]
+\minipage{0.49\textwidth}
+	\centering
+  \includegraphics[width=\linewidth]{kernel_time_n_samples.pdf}
+  \caption{Kernel time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \label{fig:n_samples_kernel}
+\endminipage
+\hfill
+\minipage{0.49\textwidth}
+  \includegraphics[width=\linewidth]{memory_time_n_samples.pdf}
+  \caption{Memory time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \label{fig:n_samples_memory}
+\endminipage
+\end{figure}
+
+In order to do the same sanity check that we did for the batch size scaling we show here how the sum of the squared errors and the weight error changed as a function of the sample size. We present those in figure \ref{fig:n_samples_error} and figure \ref{fig:n_samples_weights_error}. We see a small increase in the errors because the sum is not averaged so every time we add a term we contribute a little bit to this factor, even if the overall magnitude is still small. The weights errors on the other hand are surprisingly consistent which reflect the fact the algorithm converges quite certainly for this particular data set.   
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Number of samples errors
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}[H]
+\minipage{0.49\textwidth}
+	\centering
+  \includegraphics[width=\linewidth]{errors_n_samples.pdf}
+  \caption{Kernel time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \label{fig:n_samples_error}
+\endminipage
+\hfill
+\minipage{0.49\textwidth}
+  \includegraphics[width=\linewidth]{weights_errors_n_samples.pdf}
+  \caption{Memory time as a function of $N_s$. Here we used a batch size of $100$ Furthermore we used $3$ features ($N_f=3$). The learning rate $\alpha=0.01$ was set to ensure the convergence of the of all the runs, the data show here is for $1000$ iterations.}
+  \label{fig:n_samples_weights_error}
+\endminipage
+\end{figure}
 
 \subsection{Number of Features}
 

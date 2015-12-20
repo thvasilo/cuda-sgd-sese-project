@@ -1,8 +1,9 @@
-###
-# All the plots related to the batch_sizes should be here. For starters this should
-# give a quantiative behaviour of how the kernel time, the memory loading time, and
-# the final and weights errors vary with time
-###
+"""
+Here we will plot how the system scales with respect to the number of samples.
+In order to run this script the data has to be generated in data set 
+creation. To do this use the generate_scalable_data.py script
+"""
+
 
 from __future__ import print_function
 from subprocess import Popen, PIPE
@@ -13,18 +14,17 @@ import seaborn as sns
 
 
 # Set parameters
-cmd = './main'
+cmd = './main'  # The name of the program
 
 learning_rate = 0.01
 iterations = 1000
-name = './data/first_batch_test'
-dataset = name + '.csv'
-weights_file = name + '_weights' + '.csv'
+base_name = './data/n_samples/test_number_of_samples'
+weights_file = base_name + '_weights' + '.csv'
 batch_size = 100
 R = 1000
 C = 3
 
-# Read the weightsbat
+# Read the weights 
 with open(weights_file, 'r') as f:
     reader = csv.reader(f)
     for row in reader:
@@ -33,18 +33,25 @@ with open(weights_file, 'r') as f:
 true_weights = [float(w) for w in true_weights]
 true_weights = np.asarray(true_weights)
         
-# Iterate over batch_sizes
-batch_sizes = np.arange(10, 100, 5)
-
-# Initialize list to store
+# Initialize lists to store
 memory_times = []
 times = []
 errors = []
 weights_collection = []
 kernel_times = []
 
+n_samples = 10000
+jump = 500
+start = 1000
+data_subsets_sizes = np.arange(start, n_samples + jump, jump)
+
 # Now we run the process
-for batch_size in batch_sizes:
+for R in data_subsets_sizes:
+    print('Data size', R)
+    name = base_name + str(R)
+    dataset = name + '.csv'
+    print('data set', dataset)
+    
     parameters = [learning_rate, iterations, dataset, R, C, batch_size]
     parameters = [str(par) for par in parameters]
     run_line = [cmd] + parameters
@@ -89,12 +96,12 @@ fontsize = 18
 # First the kernel time
 fig = plt.figure()
 ax = fig.add_subplot(111)
-ax.plot(batch_sizes, kernel_times, '-o')
-ax.set_xlim(0, 100)
+ax.plot(data_subsets_sizes, kernel_times, '-o')
+ax.set_xlim(0, 10100)
 ax.set_ylim(bottom=0)
 
-ax.set_title('Kernel time scaling')
-ax.set_xlabel('Batch size')
+ax.set_title('Kernel time scaling with the number of samples')
+ax.set_xlabel('N samples')
 ax.set_ylabel('Kernel time (ms)')
 
 # Change the font size
@@ -104,7 +111,7 @@ for ax in axes:
                  ax.get_xticklabels() + ax.get_yticklabels()):
         item.set_fontsize(fontsize)
 
-name = 'kernel_time_batch_scaling'
+name = 'kernel_time_n_samples'
 filename_to_save =  folder + name + format_to_save
 fig.tight_layout()
 fig.savefig(filename_to_save, frameon=frameon,
@@ -114,12 +121,12 @@ plt.close(fig)
 # Second the memory time
 fig = plt.figure()
 ax = fig.add_subplot(111)
-ax.plot(batch_sizes, memory_times, '-o')
-ax.set_xlim(0, 100)
-ax.set_ylim(bottom=0, top=4.0)
+ax.plot(data_subsets_sizes, memory_times, '-o')
+ax.set_xlim(0, 10100)
+ax.set_ylim(bottom=0, top=25.0)
 
 ax.set_title('Memory time scaling')
-ax.set_xlabel('Batch size')
+ax.set_xlabel('N samples')
 ax.set_ylabel('Memory time (ms)')
 
 # Change the font size
@@ -129,7 +136,7 @@ for ax in axes:
                  ax.get_xticklabels() + ax.get_yticklabels()):
         item.set_fontsize(fontsize)
 
-name = 'memory_time_batch_scaling'
+name = 'memory_time_n_samples'
 filename_to_save =  folder + name + format_to_save
 fig.tight_layout()
 fig.savefig(filename_to_save, frameon=frameon,
@@ -139,12 +146,13 @@ plt.close(fig)
 # Now the total error
 fig = plt.figure()
 ax = fig.add_subplot(111)
-ax.plot(batch_sizes, errors, '-o')
-ax.set_xlim(0, 100)
+ax.plot(data_subsets_sizes, errors, '-o')
+ax.set_xlim(0, 10100)
+ax.set_ylim(bottom=0)
 
-ax.set_title('Error as a function of batch sizes')
-ax.set_xlabel('Batch size')
-ax.set_ylabel('Sum of Squared Errors (SSE)')
+ax.set_title('Error scaling with number of samples')
+ax.set_xlabel('N samples')
+ax.set_ylabel('Sum of Squares Errors (SSE)')
 
 # Change the font size
 axes = fig.get_axes()
@@ -154,7 +162,7 @@ for ax in axes:
         item.set_fontsize(fontsize)
 
 
-name = 'errors_batch_scaling'
+name = 'errors_n_samples'
 filename_to_save =  folder + name + format_to_save
 fig.tight_layout()
 fig.savefig(filename_to_save, frameon=frameon,
@@ -164,11 +172,12 @@ plt.close(fig)
 # Finally the weights errors
 fig = plt.figure()
 ax = fig.add_subplot(111)
-ax.plot(batch_sizes, weights_errors, '-o')
-ax.set_xlim(0, 100)
+ax.plot(data_subsets_sizes, weights_errors, '-o')
+ax.set_xlim(0, 10100)
+ax.set_ylim(bottom=0, top=2 * np.max(weights_errors))
 
 ax.set_title('Weights prediction error')
-ax.set_xlabel('Batch size')
+ax.set_xlabel('N samples')
 ax.set_ylabel('Weight Error')
 
 # Change the font size
@@ -178,7 +187,7 @@ for ax in axes:
                  ax.get_xticklabels() + ax.get_yticklabels()):
         item.set_fontsize(fontsize)
 
-name = 'weights_errors_batch_scaling'
+name = 'weights_errors_n_samples'
 filename_to_save =  folder + name + format_to_save
 
 fig.tight_layout()
