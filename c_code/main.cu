@@ -215,5 +215,9 @@ int main(int argc, char **argv) {
 	cudaEventElapsedTime(&miliseconds, start, stop);
 	printf("kernel time = %f \n", miliseconds);
 
+
+	cudaEventDestroy(start);
+	cudaEventDestroy(stop);
+
 	return 0;
 }
