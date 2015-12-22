@@ -114,31 +114,31 @@ and conclusions.
 
 One of the most common problems in estimation, optimization theory and machine learning is
 minimizing an objective function \citep{bottou2010large}. Consider the \textit{loss} function $Q(z,
-w)$. This function depends both on a sample $z=(x, y)$ which is a pair made of an input $x$ and an
+\Wb)$. This function depends both on a sample $z=(x, y)$ which is a pair made of an input $x$ and an
 output $y$ and on the vector $\Wb$ which parametrizes the function that connects the input to the
 output. In such a context we would like to find the vector $\Wb$ that minimizes this error averaged
 over our data. In a more mathematical parlance we write that following:
 
 \begin{equation}
-E(w) = \frac{1}{n} \sum_{i=1}^n Q(z_i, w)
+E(\Wb) = \frac{1}{n} \sum_{i=1}^n Q(z_i, \Wb)
 \end{equation}
 
 where $i$ the sample index, as we go through the complete dataset $\mathbf{z}$.
 
 The Gradient Descent method proposes moving in the direction of the gradient in order to
-find $w$. That is, we perform steps of a given size in the direction of the gradient of the loss function and update $w$ at every step:
+find $\Wb$. That is, we perform steps of a given size in the direction of the gradient of the loss function and update $\Wb$ at every step:
 
 \begin{equation}
-w_{t + 1} = w_t - \gamma \sum_{i=1}^n \triangledown_w Q(z_i, w)
+\Wb_{t + 1} = \Wb_t - \gamma \frac{1}{n} \sum_{i=1}^n \triangledown_w Q(z_i, \Wb)
 \end{equation}
 
 where $\gamma$ controls the step size. This quantity is usually called the learning rate and
-controls the speed or rate of change in $w$. $gamma$ is of crucial importance for the
-convergence or divergence of the algorithm, setting $gamma$ too high leads to large changes at each iteration and
-making it possible for the algorithm to diverge. If we set $gamma$ too small the algorithm
+controls the speed or rate of change in $\Wb$. $\gamma$ is of crucial importance for the
+convergence or divergence of the algorithm, setting $\gamma$ too high leads to large changes at each iteration,
+making it possible for the algorithm to diverge. If we set $\gamma$ too small the algorithm
 will not perform enough exploration, leading to slow convergence.
 
-Under sufficient regularity assumptions when the initial estimate of $w$ is close enough to the
+Under sufficient regularity assumptions when the initial estimate of $\Wb$ is close enough to the
 minimum and the learning rate is small enough this algorithm can achieve linear convergence
 \citep{dennis1996numerical}.
 
@@ -146,10 +146,11 @@ Stochastic Gradient Descent (SGD) is a variation of the scheme proposed above th
 when the complete dataset is not available at runtime, e.g. in a streaming setting,
 or when the data does not fit into memory.
 In this case instead of taking the average gradient over the complete data we only use the local
-gradient taken from a single datapoint to calculate the direction of movement:
+gradient taken from a single datapoint to calculate the direction of movement, and update the
+weights accordingly:
 
 \begin{equation}
-w_{t + 1} = w_t - \gamma  \triangledown_w Q(z_i, w)
+\Wb_{t + 1} = \Wb_t - \gamma  \triangledown_w Q(z_i, \Wb)
 \end{equation}
 
 It follows from the algorithm that this optimization can be implemented online due to the fact that
@@ -165,8 +166,8 @@ There, the optimization process is performed on small subsets of the complete da
 called \textit{batches}. At each step in the algorithm we choose a random subset of the data,
 calculate the gradient, and update the weights, based on the information we are able to get from
 the batch. The main advantage in speed for mini-batch SGD comes from the fact that instead of the
-matrix-vector multiplications that are necessary in plain SGD, we are able to batch samples
-together and perform matrix-matrix multiplications, thereby allowing for a more efficient learning
+vector-vector multiplications that are necessary in plain SGD, we are able to batch samples
+together and perform vector-matrix multiplications, thereby allowing for a more efficient learning
 process.
 
 \section{Parallel Stochastic Gradient Descent}
@@ -215,7 +216,7 @@ For this work we chose a variant of the algorithm described by \cite{dekel2012op
 	\item  	For each iteration:
 	\begin{enumerate}
 		\item Shuffle the dataset, and split into batches of size $b$.
-		\item For each batch in the dataset:
+		\item For each batch in the dataset, do in parallel:
 		\begin{enumerate}
 			\item Calculate the gradient for each data point in the batch.
 			\item Sum and average the gradients for all data points in the batch.
@@ -254,7 +255,7 @@ aimed at a distributed environment-- we are able to sum the gradient for the sam
 each batch. We are able to do this due to the low communication costs that we have once all the
 data is loaded to the GPU, and using this approach we able to tie the parallelization factor to the
 size of the mini-batch $b$ instead of the number of batches $c$. Depending on the data size and
-parameters, it usually true that $b \gg c$, allowing for better utilization of the GPU
+parameters, it often true that $b \gg c$, allowing for better utilization of the GPU
 architecture.
 The second difference is that where they take a random subset of the data at each iteration,
 we have the assumption that the dataset will fit into the memory of the GPU, which allows us
@@ -272,24 +273,21 @@ the gradient calculation.
 In this section we discuss the implementation tools and libraries that were used in the project.
 
 \subsection{CUDA}
-The CUDA platform was developed around 2009 \citep{nickolls2008scalable} and since then it has
-allowed the research community to harness the power of GPU for computing processing and data
-crunching without requiring expertise on graphical programming. The CUDA model is an extension of
-ANSI C where certain operations are carried out in a thread basis on the GPU. In order to do so
-CUDA provides a geometrical hierarchy that is composed of threads, blocks and grids. In this work
-we have use CUDA through the Thrust library.
+The CUDA platform was developed around 2008 \citep{nickolls2008scalable} and since then it has
+allowed developers and researchers to harness the power of GPU for scintific computing
+and numerical calculations without requiring expertise on graphical programming. The CUDA API is an extension of
+ANSI C where a single operation is performed on multiple cores on the GPU in parallel, a model
+that NVIDA calls SIMT for Single-Instruction-Multiple-Threads. In order to do so
+CUDA provides a threading hierarchy that is composed of threads, blocks and grids.
 
 \subsection{Thrust}
 Thrust is a parallel algorithms library aimed at increasing the productivity of programmers by
-offering a model of programming similar to the one of the standard library on C++
+offering a model of programming similar to the one provided by the standard library on C++
 \citep{bell2012thrust}. In other words this switches the attention from \textit{how} to compute
-something to simply \textit{what} to compute. Among the notable features that
-Thrust provides are parallel versions of scan, sort and reductions on vectors which allow us
-to utilize those functions with arbitrary types and operations.
+something to simply \textit{what} to compute. 
 
-Furthermore Thrust provides a vector container with both host and device implementations that allow us
-to use common STL operations, specific Thrust operations like reduce, and provides memory safety
-within the Thrust library.
+One of Thrust's most important features is a vector container with both host and device implementations that allow us
+to use common STL operations like addition and removal of elements, as well as Thrust-specific parallel operations like \texttt{reduce}, and provides memory safety within the Thrust library.
 
 We make use of Thrust vectors in order to store all the matrices and vectors we use
 in our implementation, and use operations like \texttt{transform}, \texttt{reduce} and \texttt{reduce\_by\_key} in order to apply SAXPY operations, vector scaling, and sums.
@@ -299,7 +297,7 @@ in our implementation, and use operations like \texttt{transform}, \texttt{reduc
 
 In this section we will show results of our time measurements. In order to measure effectively we
 use the CUDA functionality of events. The CUDA event API is the standard and recommended way to 
-bypass the non-blocking  nature of the kernel calls. 
+measure execution time in the presence the non-blocking  nature of the kernel calls. 
 In particular we time two relevant events, first we created an event recorder to 
 register the time that it takes for the program to go through the memory transfers 
 and allocations, we call this \textbf{memory time.}. Second, we created another event
@@ -380,13 +378,13 @@ We first calculated the \textbf{sum of squared errors} over all the data points,
 this allowed us to have a measure of how well the algorithm is predicting the data. 
 As an alternative view, given that we have access to the underlying model we know the 
 ground truth  for the weight, which allows us to calculate the difference between 
-the true weights or coefficients that were used to generate the data and the ones that
+the true weights that were used to generate the data and the ones that
 the model estimates. We call this the \textbf{weight error}. In Figure
 \ref{fig:test_batch_size_error} we show how for this particular experiment the
 error evolves as a function of the batch size. We note that the variation of the errors
-is very small and therefore we can claim that at least the algorithm is showing consistent
-results independently of the batch size for this dataset. Going further in Figure 
-\ref{fig:test_batch_size_werror} we show that the weights the model is predicting
+is very small and therefore we can claim that the algorithm is showing consistent
+results independent of the batch size for this dataset. Going further, in Figure 
+\ref{fig:test_batch_size_werror} we show that the weights predicted by the model
 approximate very well the ground truth which means that at least
 for this dataset the algorithm is both consistent and accurate. 
 
@@ -418,8 +416,8 @@ time for different number of samples are more pronounced for small batch sizes.
 
 We illustrate memory time behavior in Figure \ref{fig:batch_size_scaling_memory}. Again, 
 we note that there is no variation in the time that it takes to load and transfer the 
-data at this scale, as shown previously. However there as we could expect 
-there is an effect on it as we increase the quantity of data to load. 
+data at this scale, as shown previously. However there is an effect on it as we increase
+number of samples, as expected. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Number of samples scaling for batch size
@@ -445,13 +443,13 @@ there is an effect on it as we increase the quantity of data to load.
 
 In order to test how exactly our algorithm scales with the number of samples 
 of the data set ($N_s$) we calculated the kernel time for different subsets 
-size of a particular data set. As described in the experiments sections we did
-this in order to make the comparison that would change less context. The results
-of this are illustrated in figure \ref{fig:n_samples_kernel} where we can appreciate
+size of a particular data set. As described in the introduction to this section, we did
+this in order to ensure the data generating process remains the same through these
+experiments. The results of this are illustrated in figure \ref{fig:n_samples_kernel} where we can appreciate
 a linear increase with the sample size. We repeated the process for 
 the memory time and we illustrate the results of this experiments 
-in figure \ref{fig:n_samples_memory}. In it we can appreciate 
-the more chaotic but still linear increase of the memory time as function of the sample size. 
+in figure \ref{fig:n_samples_memory}. In it we can see
+the a similar linear increase of the memory time as a function of the sample size. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Number of samples scaling 
@@ -471,7 +469,12 @@ the more chaotic but still linear increase of the memory time as function of the
 \endminipage
 \end{figure}
 
-In order to do the same sanity check that we did for the batch size scaling we show here how the sum of the squared errors and the weight error changed as a function of the sample size. We present those in Figure \ref{fig:n_samples_error} and Figure \ref{fig:n_samples_weights_error}. We see a small increase in the errors because the sum is not averaged so every time we add a term we contribute a little bit to this factor, even if the overall magnitude is still small. The weights errors on the other hand are surprisingly consistent which reflect the fact the algorithm converges quite certainly for this particular data set.
+In order to do the same sanity check that we did for the batch size scaling we show here how the sum of the squared errors
+and the weight error changed as a function of the sample size. We present those in Figure \ref{fig:n_samples_error} and
+Figure \ref{fig:n_samples_weights_error}. We see a small increase in the errors because the sum is not averaged so every
+time we add a term we contribute a little bit to this factor, even if the overall magnitude is still small. The weight
+errors on the other hand are surprisingly consistent which reflect the fact the algorithm converges quite certainly for this 
+particular data set.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Number of samples errors
@@ -497,10 +500,10 @@ In order to do the same sanity check that we did for the batch size scaling we s
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 We also examined the accuracy and scaling of the implementation in terms of the number
-of features ($N_f$). In terms of runtime scaling we observe a linear increase as we
-increase the features. This behavior can be explained from the fact that the number of
+of features ($N_f$). In terms of runtime scaling we observe a linear increase with
+the features. This behavior can be explained from the fact that the number of
 features mostly affect the vector operations (dot product)
-that are done in the gradient calculation, which are done sequentially within each kernel.
+that are done within the gradient calculation, which are done sequentially within each kernel.
 As we increase the features, we are adding more work that is not parallelized, thereby
 increasing the runtime. The increase in memory time can be explained by the increase in data
 size that comes with more features.
