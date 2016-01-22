@@ -24,8 +24,7 @@ int iDivUp(int a, int b){ return ((a % b) != 0) ? (a / b + 1) : (a / b); }
 // NB: We are assuming that the csv has the format [features],[label]
 // i.e. the last column is the label, and all others are features.
 // num_features should equal the number of features only, i.e. the number of columns in the csv minus 1
-// e.g.: > ./main 0.001 10 data/5xy.csv 40 1
-// or with real data: > ./main 0.000004 500 data/ENB2012_data_Y1.csv 768 8
+// e.g.: > ./main 0.00001 10 data/5xy.csv 40 1 0
 int main(int argc, char **argv) {
 
 	if	(argc != 7) {
@@ -41,10 +40,6 @@ int main(int argc, char **argv) {
 	const int C = atoi(argv[5]);
 	const int batchsize = (atoi(argv[6])  == 0) ? R : atoi(argv[6]);
 	const int num_batches = (int)std::floor(R/(float)batchsize);
-
-	// std::cout << "lr: " << learning_rate << std::endl;
-	// std::cout << "batchsize: " << batchsize << std::endl;
-	// std::cout << "num_batches: " << num_batches << std::endl;
 
 	cudaEvent_t start_memory;
 	cudaEvent_t stop_memory;
@@ -103,16 +98,19 @@ int main(int argc, char **argv) {
 	for (int i = 0; i < R; ++i) {
 		ind_vector[i] = i;
 	}
+	// Shuffle the vector on the host, and copy to the device
 	std::random_shuffle(ind_vector.begin(), ind_vector.end());
 	batch_indices = ind_vector;
-//	print_vector(batch_indices, "batch_indices");
 
 	// Now measure the differences
 	cudaEventRecord(stop_memory);
 	cudaEventSynchronize(stop_memory);
 	float miliseconds_memory = 0;
 	cudaEventElapsedTime(&miliseconds_memory, start_memory, stop_memory);
-	printf("Memory time = %f \n", miliseconds_memory);
+	printf("Memory time = %f ms\n", miliseconds_memory);
+
+	cudaEventDestroy(start_memory);
+	cudaEventDestroy(stop_memory);
 
 	cudaEvent_t start;
 	cudaEvent_t stop;
@@ -123,8 +121,7 @@ int main(int argc, char **argv) {
 	
 	// Start measuring the event
 	cudaEventRecord(start);
-	// Get the first time	
-	// TODO: Put iterations in SGD_Step function
+
 	for (int epoch = 1; epoch <= MAX_EPOCHS; ++epoch) {
 		// We shuffle the data indexes before the start of each epoch
 		// TODO: How is performance if we shuffle the data instead of indices, i.e. having sequential accesses instead of random?
@@ -135,7 +132,7 @@ int main(int argc, char **argv) {
 			thrust::fill(gradients.begin(), gradients.end(), 0.0);
 
 			//Calculate the gradient vector for each datapoint
-			calculate_gradients<<<iDivUp(batchsize, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(//iDivUp(batchsize, THREADS_PER_BLOCK)
+			calculate_gradients<<<iDivUp(batchsize, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
 					data_raw_ptr,
 					labels_raw_ptr,
 					weights_raw_ptr,
@@ -144,27 +141,22 @@ int main(int argc, char **argv) {
 					batchsize,
 					C);
 
-//			print_matrix(gradients, "weight_gradients", C, batchsize);
-
 			// Sum/reduce the gradient vectors
 			thrust::fill(row_sums.begin(), row_sums.end(), 0.0);
 			thrust::fill(row_indices.begin(), row_indices.end(), 0.0);
 			calculate_row_sums(C, batchsize, gradients, row_sums, row_indices);
-
-//			print_vector(row_sums, "gradients");
 
 			// Scale gradient sum vector
 			thrust::for_each(row_sums.begin(), row_sums.end(), _1 / (float)batchsize);
 
 			//Update the weight vector
 			float a = -(learning_rate / std::pow(epoch, 0.25));
-			//		std::cout << "a: " << a << std::endl;
+
 			// Thrust SAXPY
 			thrust::transform(row_sums.begin(), row_sums.end(),  // input range #1
 					weights.begin(),           // input range #2
 					weights.begin(),           // output range
 					a * _1 + _2);        // placeholder expression
-//			print_vector(weights, "weights");
 		}
 		if	(epoch % 100 == 0) {
 			thrust::fill(errors.begin(), errors.end(), 0.0);
@@ -178,11 +170,6 @@ int main(int argc, char **argv) {
 					C);
 			// Reduce/sum the errors
 			float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
-			//printf("epoch: %d\n", epoch);
-			// Print weights and squared error sum
-			// print_vector(weights, "weights");
-			// std::cout << "Squared error sum: " << sq_err_sum << std::endl;
-			// print_matrix(gradients, "weight_gradients", R, C);
 		}
 
 	}
@@ -190,7 +177,6 @@ int main(int argc, char **argv) {
 
 	// Print final weights and squared error sum
 	// Calculate the squared error for each data point
-	//		cudaDeviceSynchronize();
 	squared_errors<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
 			data_raw_ptr,
 			labels_raw_ptr,
@@ -198,10 +184,6 @@ int main(int argc, char **argv) {
 			errors_raw_ptr,
 			R,
 			C);
-
-	//	float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
-	//	print_vector(weights, "final_weights");
-	//	std::cout << "Final squared error sum: " << sq_err_sum << std::endl;
 
 	// Print final quantities
 	float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
@@ -213,7 +195,7 @@ int main(int argc, char **argv) {
 	cudaEventSynchronize(stop);
 	float miliseconds = 0;
 	cudaEventElapsedTime(&miliseconds, start, stop);
-	printf("kernel time = %f \n", miliseconds);
+	printf("kernel time = %f ms\n", miliseconds);
 
 
 	cudaEventDestroy(start);

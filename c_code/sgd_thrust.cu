@@ -1,23 +1,5 @@
 #include "sgd_thrust.cuh"
 
-
-// convert a linear index to a row index
-template <typename T>
-struct linear_index_to_row_index : public thrust::unary_function<T,T>
-{
-  T C; // number of columns
-
-  __host__ __device__
-  linear_index_to_row_index(T C) : C(C) {}
-
-  __host__ __device__
-  T operator()(T i)
-  {
-    return i / C;
-  }
-};
-
-
 /**
  * Returns the squared loss derivative
  * The way this works is: We provide pointers to items inside the data and label vectors,
@@ -43,6 +25,9 @@ __device__ float squared_loss_derivative(
 	return loss_derivative;
 }
 
+/**
+ * Calculates the sum of squared errors, given the data, labels and weights
+ */
 __global__ void squared_errors(
 	const float * data_array_d,
 	const float * label_vector_d,
@@ -63,6 +48,9 @@ __global__ void squared_errors(
 	}
 }
 
+/**
+ * Calculates the weight gradients for each data point in the batch
+ */
 __global__ void calculate_gradients(
 	const float * data_array_d,
 	const float * label_vector_d,
@@ -76,7 +64,6 @@ __global__ void calculate_gradients(
 	// We want each thread to take one "row" of the matrix and only modify that.
 
 	int thread_index = blockIdx.x * blockDim.x + threadIdx.x; // Should be row index
-	//int example_index = thread_index * C;
 
 	// TODO: Vector operations should be done with cuBLAS using dynamic parallelism
 	if (thread_index < R) {
@@ -85,7 +72,7 @@ __global__ void calculate_gradients(
 		int example_index = batch_indices_d[thread_index];
 		// The linear index gives us the first element of the data array for the example in the interleaved array.
 		int linear_index = example_index * C;
-//		printf("thread idx: %d, example idx: %d\n", thread_index, example_index);
+
 		// Here we call squared_loss_derivative with the correct offsets, example_index for the data array
 		// and thread_index for the labels array
 		float loss_derivative = squared_loss_derivative(
@@ -96,14 +83,14 @@ __global__ void calculate_gradients(
 		// Scale the gradient by the loss_derivative
 		for (int i = 0; i < C; ++i) {
 			// For linear models the gradient equals the features
-//			printf("thread idx: %d, i: %d, gradient_index: %d\n", thread_index, i, i*R + thread_index);
-//			printf("thread idx: %d, loss derivative: %f\n", thread_index, loss_derivative);
 			gradients_d[i*R + thread_index] = loss_derivative * data_array_d[linear_index + i];
 		}
-//		printf("\n");
 	}
 }
 
+/**
+ * Calculates the sum of the rows in an interleaved array using Thrust
+ */
 __host__ void calculate_row_sums(
 	const int R,
 	const int C,
