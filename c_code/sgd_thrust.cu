@@ -1,7 +1,9 @@
 #include "sgd_thrust.cuh"
+#include "sgd_io.cuh"
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
-#include "sgd_io.cuh"
+#include <thrust/sequence.h>
+
 
 /**
  * Returns the squared loss derivative
@@ -129,6 +131,45 @@ __host__ void calculate_row_sums(
 		thrust::equal_to<int>(),
 		thrust::plus<float>());
 }
+
+// Summation functor used for the column sum operation
+struct sum_functor
+{
+  int R;
+  int C;
+  float *arr;
+
+  sum_functor(int _R, int _C, float *_arr) : R(_R), C(_C), arr(_arr) {};
+
+  __host__ __device__
+  float operator()(int myC){
+	  float sum = 0.0;
+	  for (int i = 0; i < R; ++i) {
+		  sum += arr[i*C+myC];
+	  }
+	return sum;
+	}
+};
+
+/**
+ * Calculates the sum of each column in array (of size R*C) and stores it in col_sums.
+ */
+__host__ void calculate_column_sums(
+		float * array,
+		thrust_dev_float& col_sums,
+		const int R,
+		const int C) {
+
+	// Need to initially set the elements of the sums vector to a sequence, since they represent the indices.
+	thrust::sequence(col_sums.begin(), col_sums.end());
+	// Perform the sum column transformation
+	thrust::transform(
+		col_sums.begin(),
+		col_sums.end(),
+		col_sums.begin(),
+		sum_functor(R, C, array));
+}
+
 /**
  * For an RxC matrix and a vector of size R, scales each element in each row of the matrix
  * by the corresponding element in the scaling_vector.
@@ -138,13 +179,14 @@ __host__ void calculate_row_sums(
  * Taken from: http://stackoverflow.com/q/9290935/209882
  */
 __host__ void scale_matrix_rows_by_vector(
-	const thrust_dev_float & matrix,
+	const thrust::device_ptr<float> & matrix,
 	const thrust_dev_float & scaling_vector,
 	thrust_dev_float & matrix_normalized,
+	const int R,
 	const int C) {
 
 	thrust::transform(
-		matrix.begin(), matrix.end(),
+		matrix, matrix + (R*C),
 	    thrust::make_permutation_iterator(
 	    scaling_vector.begin(),
 	    thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), linear_index_to_row_index<int>(C))),
@@ -152,6 +194,12 @@ __host__ void scale_matrix_rows_by_vector(
 	    thrust::multiplies<float>());
 }
 
+// The loss derivative vector is equal to the vector of predictions minus the label vector for the batch.
+// We get the prediction vector from the matrix-vector multiplication of the data batch matrix with the
+// weights vector, from which we then subtract the labels vector, which we have previously copied from
+// label_vector into the loss derivative vector, which is the destination for the complete operation.
+// In short: loss_der = B * w - label
+// where B is the batch data matrix and the rest are vectors
 __host__ void calculate_loss_derivative_cublas(
 	const float * data_array_d,
 	const float * label_vector_d,
@@ -162,7 +210,6 @@ __host__ void calculate_loss_derivative_cublas(
 	const int batchsize) {
 	// We are assuming that data_array_d points to the first element in the batch in the data array,
 	// and label_vector_d points to the corresponding element in the label vector
-
 
 	// Set up cuBLAS environment
 	cublasHandle_t cnpHandle;
@@ -175,14 +222,6 @@ __host__ void calculate_loss_derivative_cublas(
 			batchsize,
 			label_vector_d, 1,
 			loss_derivative_d, 1);
-
-
-	// The loss derivative vector is equal to the vector of predictions minus the label vector for the batch.
-	// We get the prediction vector from the matrix-vector multiplication of the data batch matrix with the
-	// weights vector, from which we then subtract the labels vector, which we have previously copied from
-	// label_vector into the loss derivative vector, which is the destination for the complete operation.
-	// In short: loss_der = B * w - label
-	// where B is the batch data matrix and the rest are vectors
 
 	const float alpha = 1.0;
 	const float a_minus = -1.0;
@@ -207,13 +246,6 @@ __host__ void calculate_loss_derivative_cublas(
 	if (status != CUBLAS_STATUS_SUCCESS) {
 		    std::cerr << "Failed to execute the gemv!\n";
 	}
-
-	// The gradient vector is equal to the feature matrix of the batch multiplied by the loss derivative vector
-	// TODO: Do the scaling of the batch in another function using scale_matrix_rows_by_vector (in main)
-
-	// TODO: Once we have the scaled data matrix, i.e. the gradients I will need to sum the columns (prolly easier
-	// in plain CUDA) and scale to get the avg. gradient vector.
-
 	// Clean up cuBLAS environment
 	cublasDestroy(cnpHandle);
 }

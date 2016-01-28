@@ -20,11 +20,42 @@ using namespace thrust::placeholders;
 // Arguments: a: number of items to divide, b: desired number of threads in each block
 int iDivUp(int a, int b){ return ((a % b) != 0) ? (a / b + 1) : (a / b); }
 
+void test_col_sums() {
+	const int R = 5;
+	const int C = 4;
+
+	// Initialize data vector on host
+	thrust_host_float data_h(R * C);
+
+	// Initialize labels vector on host
+	thrust_host_float labels(R);
+
+	std::string filename = "data/col_sum_test.csv";
+	// Read data from csv file into host vectors
+	read_csv(filename, data_h, labels, R, C);
+
+	print_matrix(data_h, "data_h", R, C);
+
+	// Copy data from host vectors to device
+	thrust_dev_float data_d = data_h;
+	float* data_dev_ptr = thrust::raw_pointer_cast(data_d.data());
+
+	// Initialize the column sum vector
+	thrust_dev_float col_sums(C);
+
+	calculate_column_sums(
+			data_dev_ptr,
+			col_sums,
+			R,
+			C);
+
+	thrust_host_float col_sums_h = col_sums;
+	print_vector(col_sums_h, "column_sums");
+}
+
 void test_matrix_scale() {
 	const int R = 5;
 	const int C = 4;
-	const int batchsize = 5;
-	const int num_batches = 1;
 
 	// Initialize data vector on host
 	thrust_host_float data_h(R * C);
@@ -41,15 +72,17 @@ void test_matrix_scale() {
 
 	// Copy data from host vectors to device
 	thrust_dev_float data_d = data_h;
+	thrust::device_ptr<float> data_dev_ptr = data_d.data();
 	thrust_dev_float scaling_d = scaling_vector;
 
 	// Initialize the results matrix
 	thrust_dev_float scaled_matrix(R*C);
 
 	scale_matrix_rows_by_vector(
-		data_d,
+		data_dev_ptr,
 		scaling_d,
 		scaled_matrix,
+		R,
 		C);
 
 	print_matrix(scaled_matrix, "data_h_scaled", R, C);
@@ -60,7 +93,6 @@ void test_gemv() {
 	const int R = 5;
 	const int C = 4;
 	const int batchsize = 5;
-	const int num_batches = 1;
 
 	// Initialize data vector on host
 	thrust_host_float data_h(R * C);
@@ -73,7 +105,7 @@ void test_gemv() {
 	read_csv(filename, data_h, labels_h, R, C);
 
 	print_matrix(data_h, "data_h", R, C);
-	print_vector(labels_h, "labels_h");
+
 
 	// Copy data from host vectors to device
 	// The data matrix has all elements equal to their row index + 1
@@ -88,6 +120,8 @@ void test_gemv() {
 	thrust::fill(weights.begin(), weights.end(), 1.0);
 	float * weights_raw_ptr = thrust::raw_pointer_cast(weights.data());
 
+	print_vector(weights, "weights");
+	print_vector(labels_h, "labels_h");
 	// Initialize loss derivative vector
 	thrust_dev_float loss_derivative(batchsize);
 	float * loss_derivative_raw_ptr = thrust::raw_pointer_cast(loss_derivative.data());
@@ -115,11 +149,13 @@ void test_gemv() {
 // e.g.: > ./main 0.00001 10 data/5xy.csv 40 1 0
 int main(int argc, char **argv) {
 
-	test_gemv();
-
-	test_matrix_scale();
-
-	return 0;
+//	test_gemv();
+//
+//	test_matrix_scale();
+//
+//	test_col_sums();
+//
+//	return 0;
 
 	if	(argc != 7) {
 		std::cout << "usage: ./sgd_thrust.o [learning_rate] "
@@ -173,7 +209,7 @@ int main(int argc, char **argv) {
 	}
 
 	// Initialize gradients
-	thrust_dev_float gradients(C * batchsize);
+	thrust_dev_float gradients(batchsize * C);
 	float * gradients_raw_ptr = thrust::raw_pointer_cast(gradients.data());
 
 	// Initialize loss derivative vector
@@ -185,8 +221,7 @@ int main(int argc, char **argv) {
 	float * errors_raw_ptr = thrust::raw_pointer_cast(errors.data());
 
 	// Allocate storage for row sums and indices
-	thrust_dev_float row_sums(C);
-	thrust_dev_int row_indices(C);
+	thrust_dev_float col_sums(C);
 
 	// Initialize batch indices vector
 	thrust_dev_int batch_indices(R);
@@ -228,30 +263,47 @@ int main(int argc, char **argv) {
 		for (int batch = 0; batch < num_batches; ++batch) {
 			// Reset gradients and errors
 			thrust::fill(gradients.begin(), gradients.end(), 0.0);
+			//thrust::fill(loss_derivative.begin(), loss_derivative.end(), 0.0);
 
-			//Calculate the gradient vector for each datapoint
-			calculate_gradients<<<iDivUp(batchsize, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
-					data_raw_ptr,
-					labels_raw_ptr,
+			// Calculate the loss derivative vector
+			// TODO: We are assuming that data_array_d points to the first element in the batch in the data array,
+			// and label_vector_d points to the corresponding element in the label vector
+			float * cur_batch_data_ptr = data_raw_ptr;
+			thrust::device_ptr<float> cur_batch_data_dev_ptr(cur_batch_data_ptr);
+			float * cur_batch_labels_ptr = labels_raw_ptr;
+
+			calculate_loss_derivative_cublas(
+					cur_batch_data_ptr, // TODO: Fix offsets to be consistent with current batch
+					cur_batch_labels_ptr,
 					weights_raw_ptr,
-					batch_indices_ptr  + (batch * batchsize),
-					gradients_raw_ptr,
-					batchsize,
-					C);
+					loss_derivative_raw_ptr,
+					R,
+					C,
+					batchsize);
 
-			// Sum/reduce the gradient vectors
-			thrust::fill(row_sums.begin(), row_sums.end(), 0.0);
-			thrust::fill(row_indices.begin(), row_indices.end(), 0.0);
-			calculate_row_sums(C, batchsize, gradients, row_sums, row_indices);
+			// The gradient matrix is equal to the feature matrix of the batch scaled by the loss derivative vector
+			scale_matrix_rows_by_vector(
+				cur_batch_data_dev_ptr,
+				loss_derivative,
+				gradients, // Result stored in gradient matrix (batchsize*C)
+				batchsize,
+				C);
 
-			// Scale gradient sum vector
-			thrust::for_each(row_sums.begin(), row_sums.end(), _1 / (float)batchsize);
+			// Once we have the scaled data matrix, i.e. the gradients we need to sum the columns and scale to get the avg. gradient vector.
+			calculate_column_sums(
+				cur_batch_data_ptr,
+				col_sums,
+				batchsize,
+				C);
+
+			// Scale gradient sum vector to obtain avg. gradient vector
+			thrust::for_each(col_sums.begin(), col_sums.end(), _1 / (float)batchsize);
 
 			//Update the weight vector
 			float a = -(learning_rate / std::pow(epoch, 0.25));
 
-			// Thrust SAXPY
-			thrust::transform(row_sums.begin(), row_sums.end(),  // input range #1
+			// Thrust SAXPY, used to update the weights vector
+			thrust::transform(col_sums.begin(), col_sums.end(),  // input range #1
 					weights.begin(),           // input range #2
 					weights.begin(),           // output range
 					a * _1 + _2);        // placeholder expression

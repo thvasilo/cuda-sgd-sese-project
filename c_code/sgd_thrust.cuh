@@ -51,10 +51,17 @@ __host__ void calculate_loss_derivative_cublas(
 	const int batchsize);
 
 __host__ void scale_matrix_rows_by_vector(
-	const thrust_dev_float & matrix,
+	const thrust::device_ptr<float> & matrix,
 	const thrust_dev_float & scaling_vector,
 	thrust_dev_float & matrix_normalized,
-	const int C);
+	const int R,
+	const int c);
+
+__host__ void calculate_column_sums(
+		float * array, // TODO: Can I make this into a const?
+		thrust_dev_float& col_sums,
+		const int R,
+		const int C);
 
 // convert a linear index to a row index
 template <typename T>
