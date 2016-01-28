@@ -1,21 +1,25 @@
-INC	:= -I$(CUDA_HOME)/include -I.
-LIB	:= -L$(CUDA_HOME)/lib64 #-lcudart
+CUDA_HOME := /usr/local/cuda-7.5
+INC	:= #-I $(CUDA_HOME)/include -I.
+# Need to use lculibos when using lcublas_static, culbas_device necessary for cuBLAS calls within kernel
+LIB	:= -L $(CUDA_HOME)/lib64 -lcudadevrt -lcublas_static -lculibos -lcublas_device# -lcudart_static  -lcublas_static 
 
+# NB! arch=sm_35 is the lowest supported for dynamic parallelism
 # NVCCFLAGS	:= -lineinfo -arch=sm_20 #--ptxas-options=-v --use_fast_math
-# NVCCFLAGS	:= -lineinfo -arch=sm_50 --std=c++11 #-g -G --ptxas-options=-v --use_fast_math
-NVCCFLAGS	:= -lineinfo -arch=sm_30 --std=c++11 #-g -G --ptxas-options=-v --use_fast_math
+NVCCFLAGS := -lineinfo -arch=sm_50 --std=c++11#-g -G --ptxas-options=-v --use_fast_math
+#NVCCFLAGS	:= -lineinfo -arch=sm_35 --std=c++11 #-g -G --ptxas-options=-v --use_fast_math
 
-OBJECTS := sgd_io.o sgd_thrust.o main.o
+OBJECTS := main.o sgd_thrust.o sgd_io.o
 
 CFLAGS := -Wall -g
 CXXFLAGS := -Wall -Wextra -g --std=c++11 -pedantic
 CXX := g++
+NVCC := nvcc
 
 all:  $(OBJECTS)
-	nvcc $(NVCCFLAGS) $(OBJECTS) -o main
+	$(NVCC) $(NVCCFLAGS) $(OBJECTS) $(INC) $(LIB) -o main
 
 %.o: %.cu #%.cpp
-	nvcc $(NVCCFLAGS) -x cu -I. -dc $< -o $@
+	$(NVCC) $(NVCCFLAGS) $(INC) -x cu -I. -dc $< -o $@
 
 clean:
 	rm -f *.o main

@@ -11,12 +11,100 @@
 #include <thrust/random.h>
 #include <thrust/inner_product.h>
 #include <thrust/device_ptr.h>
+#include <cuda_runtime.h>
+#include "cublas_v2.h"
 
 using namespace thrust::placeholders;
 
 // Function to divide tasks up to threads
 // Arguments: a: number of items to divide, b: desired number of threads in each block
 int iDivUp(int a, int b){ return ((a % b) != 0) ? (a / b + 1) : (a / b); }
+
+void test_matrix_scale() {
+	const int R = 5;
+	const int C = 4;
+	const int batchsize = 5;
+	const int num_batches = 1;
+
+	// Initialize data vector on host
+	thrust_host_float data_h(R * C);
+
+	// Initialize labels vector on host
+	thrust_host_float scaling_vector(R);
+
+	std::string filename = "data/matrix_scale_test";
+	// Read data from csv file into host vectors
+	read_csv(filename, data_h, scaling_vector, R, C);
+
+	print_matrix(data_h, "data_h", R, C);
+	print_vector(scaling_vector, "scaling_vector");
+
+	// Copy data from host vectors to device
+	thrust_dev_float data_d = data_h;
+	thrust_dev_float scaling_d = scaling_vector;
+
+	// Initialize the results matrix
+	thrust_dev_float scaled_matrix(R*C);
+
+	scale_matrix_rows_by_vector(
+		data_d,
+		scaling_d,
+		scaled_matrix,
+		C);
+
+	print_matrix(scaled_matrix, "data_h_scaled", R, C);
+}
+
+void test_gemv() {
+
+	const int R = 5;
+	const int C = 4;
+	const int batchsize = 5;
+	const int num_batches = 1;
+
+	// Initialize data vector on host
+	thrust_host_float data_h(R * C);
+
+	// Initialize labels vector on host
+	thrust_host_float labels_h(R);
+
+	std::string filename = "data/gemv_test";
+	// Read data from csv file into host vectors
+	read_csv(filename, data_h, labels_h, R, C);
+
+	print_matrix(data_h, "data_h", R, C);
+	print_vector(labels_h, "labels_h");
+
+	// Copy data from host vectors to device
+	// The data matrix has all elements equal to their row index + 1
+	thrust_dev_float data_d = data_h;
+	const float * data_raw_ptr = thrust::raw_pointer_cast(data_d.data());
+	// All the labels are 4.0
+	thrust_dev_float labels_d = labels_h;
+	const float * labels_raw_ptr = thrust::raw_pointer_cast(labels_d.data());
+
+	// Initialize weights to 1
+	thrust_dev_float weights(C);
+	thrust::fill(weights.begin(), weights.end(), 1.0);
+	float * weights_raw_ptr = thrust::raw_pointer_cast(weights.data());
+
+	// Initialize loss derivative vector
+	thrust_dev_float loss_derivative(batchsize);
+	float * loss_derivative_raw_ptr = thrust::raw_pointer_cast(loss_derivative.data());
+
+	calculate_loss_derivative_cublas(
+		data_raw_ptr,
+		labels_raw_ptr,
+		weights_raw_ptr,
+		loss_derivative_raw_ptr,
+		R,
+		C,
+		batchsize);
+
+	thrust_host_float loss_derivative_host(batchsize);
+	loss_derivative_host = loss_derivative;
+	print_vector(loss_derivative_host, "loss_derivative");
+}
 
 // Usage: Run with all arguments:
 // args: [learning_rate] [iterations] [data_csv_file] [num_rows] [num_features] [batchsize]
@@ -26,6 +114,12 @@ int iDivUp(int a, int b){ return ((a % b) != 0) ? (a / b + 1) : (a / b); }
 // num_features should equal the number of features only, i.e. the number of columns in the csv minus 1
 // e.g.: > ./main 0.00001 10 data/5xy.csv 40 1 0
 int main(int argc, char **argv) {
+
+	test_gemv();
+
+	test_matrix_scale();
+
+	return 0;
 
 	if	(argc != 7) {
 		std::cout << "usage: ./sgd_thrust.o [learning_rate] "
@@ -81,6 +175,10 @@ int main(int argc, char **argv) {
 	// Initialize gradients
 	thrust_dev_float gradients(C * batchsize);
 	float * gradients_raw_ptr = thrust::raw_pointer_cast(gradients.data());
+
+	// Initialize loss derivative vector
+	thrust_dev_float loss_derivative(batchsize);
+	float * loss_derivative_raw_ptr = thrust::raw_pointer_cast(loss_derivative.data());
 
 	//Initialize errors vector
 	thrust_dev_float errors(R);

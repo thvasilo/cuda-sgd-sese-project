@@ -1,4 +1,7 @@
 #include "sgd_thrust.cuh"
+#include <cuda_runtime.h>
+#include <cublas_v2.h>
+#include "sgd_io.cuh"
 
 /**
  * Returns the squared loss derivative
@@ -12,16 +15,26 @@ __device__ float squared_loss_derivative(
 	const float * label_vector_d,
 	const float * weights_d,
 	const int C) {
+	cublasHandle_t cublasHandle;
+	cublasStatus_t status = cublasCreate(&cublasHandle);
+
+	if (status != CUBLAS_STATUS_SUCCESS)
+	{
+		printf("Something went wrong with cuBLAS initialization in squared_loss_derivative\n");
+	}
 
 	// Calculate prediction
 	float prediction = 0.0;
+	float * pred_p = &prediction;
 	// TODO: Guard against accesses that go outside the data_array_d limits
-	// TODO: Vector operations should be done with cuBLAS using dynamic parallelism
-	for (int i = 0; i < C; ++i) {
-		prediction += data_array_d[i] * weights_d[i];
-	}
+	cublasSdot(cublasHandle, C, data_array_d, 1, weights_d, 1, pred_p);
+//	for (int i = 0; i < C; ++i) {
+//		prediction += data_array_d[i] * weights_d[i];
+//	}
 	// For squared loss the loss derivative is equal to the simple loss: (y_hat - y_true)
 	float loss_derivative = prediction - *label_vector_d;
+
+	cublasDestroy(cublasHandle);
 	return loss_derivative;
 }
 
@@ -62,6 +75,13 @@ __global__ void calculate_gradients(
 	// TODO: R, C should be device constants
 	// Each data point should get one thread
 	// We want each thread to take one "row" of the matrix and only modify that.
+	cublasHandle_t cnpHandle;
+	cublasStatus_t status = cublasCreate(&cnpHandle);
+
+	if (status != CUBLAS_STATUS_SUCCESS)
+	{
+		printf("Something went wrong with cuBLAS initialization in calculate_gradients\n");
+	}
 
 	int thread_index = blockIdx.x * blockDim.x + threadIdx.x; // Should be row index
 
@@ -86,6 +106,8 @@ __global__ void calculate_gradients(
 			gradients_d[i*R + thread_index] = loss_derivative * data_array_d[linear_index + i];
 		}
 	}
+
+	cublasDestroy(cnpHandle);
 }
 
 /**
@@ -107,3 +129,94 @@ __host__ void calculate_row_sums(
 		thrust::equal_to<int>(),
 		thrust::plus<float>());
 }
+/**
+ * For an RxC matrix and a vector of size R, scales each element in each row of the matrix
+ * by the corresponding element in the scaling_vector.
+ * i.e. each element in row 1 of the matrix is multiplied by the element 1 of the scaling_vector,
+ * each element in row 2 is multiplied by element 2 ine the vector etc.
+ * The result is stored in matrix_normalized.
+ * Taken from: http://stackoverflow.com/q/9290935/209882
+ */
+__host__ void scale_matrix_rows_by_vector(
+	const thrust_dev_float & matrix,
+	const thrust_dev_float & scaling_vector,
+	thrust_dev_float & matrix_normalized,
+	const int C) {
+
+	thrust::transform(
+		matrix.begin(), matrix.end(),
+	    thrust::make_permutation_iterator(
+	    scaling_vector.begin(),
+	    thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), linear_index_to_row_index<int>(C))),
+	    matrix_normalized.begin(),
+	    thrust::multiplies<float>());
+}
+
+__host__ void calculate_loss_derivative_cublas(
+	const float * data_array_d,
+	const float * label_vector_d,
+	const float * weights_d,
+	float * loss_derivative_d,
+	const int R,
+	const int C,
+	const int batchsize) {
+	// We are assuming that data_array_d points to the first element in the batch in the data array,
+	// and label_vector_d points to the corresponding element in the label vector
+
+
+	// Set up cuBLAS environment
+	cublasHandle_t cnpHandle;
+	cublasStatus_t status = cublasCreate(&cnpHandle);
+
+	// We copy the labels into the loss derivative vector, since the gemv operation below is destructive for
+	// the destination vector
+	cublasScopy(
+			cnpHandle,
+			batchsize,
+			label_vector_d, 1,
+			loss_derivative_d, 1);
+
+
+	// The loss derivative vector is equal to the vector of predictions minus the label vector for the batch.
+	// We get the prediction vector from the matrix-vector multiplication of the data batch matrix with the
+	// weights vector, from which we then subtract the labels vector, which we have previously copied from
+	// label_vector into the loss derivative vector, which is the destination for the complete operation.
+	// In short: loss_der = B * w - label
+	// where B is the batch data matrix and the rest are vectors
+
+	const float alpha = 1.0;
+	const float a_minus = -1.0;
+
+	// To use gemv with row-major matrices we enter reverse values for rows and columns, take the transpose
+	// of the matrix and assign the number of columns as the leading dimension
+	// See http://peterwittek.com/cublas-matrix-c-style.html and http://stackoverflow.com/q/21164373/209882
+	status = cublasSgemv(
+		cnpHandle,
+		CUBLAS_OP_T,
+		C, // Set the num of columns as the number of rows in the matrix
+		batchsize, // Set the num of rows (=batchsize) as the number of columns in the matrix
+		&alpha,
+		data_array_d,
+		C, // We set the leading dimension for data_array to be the number of cols, since we are using C-style row-major arrays.
+		weights_d,
+		1,
+		&a_minus,
+		loss_derivative_d, // The result of the calculation is stored in the loss derivative vector
+		1);
+	// Check if the gemv operation was successful
+	if (status != CUBLAS_STATUS_SUCCESS) {
+		    std::cerr << "Failed to execute the gemv!\n";
+	}
+
+	// The gradient vector is equal to the feature matrix of the batch multiplied by the loss derivative vector
+	// TODO: Do the scaling of the batch in another function using scale_matrix_rows_by_vector (in main)
+
+	// TODO: Once we have the scaled data matrix, i.e. the gradients I will need to sum the columns (prolly easier
+	// in plain CUDA) and scale to get the avg. gradient vector.
+
+	// Clean up cuBLAS environment
+	cublasDestroy(cnpHandle);
+}
+
+
+// TODO: Permute matrix rows on device
