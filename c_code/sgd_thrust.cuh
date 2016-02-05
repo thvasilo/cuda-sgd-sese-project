@@ -63,6 +63,16 @@ __host__ void calculate_column_sums(
 		const int R,
 		const int C);
 
+__host__ void permute_data_and_labels(
+		const thrust_dev_float& data,
+		const thrust_dev_float& labels,
+		const thrust::device_vector<unsigned>& order,
+		thrust_dev_float& permuted_data,
+		thrust_dev_float& permuted_labels,
+		const unsigned R,
+		const unsigned C);
+
+
 // convert a linear index to a row index
 template <typename T>
 struct linear_index_to_row_index : public thrust::unary_function<T,T>
@@ -79,5 +89,35 @@ struct linear_index_to_row_index : public thrust::unary_function<T,T>
   }
 };
 
+template <typename T>
+struct row_index_to_linear_index : public thrust::unary_function<T,T>
+{
+  T C; // number of columns
+
+  __host__ __device__
+  row_index_to_linear_index(T C) : C(C) {}
+
+  __host__ __device__
+  T operator()(T i)
+  {
+    return i * C;
+  }
+};
+
+// Used to permute matrix/vectors
+// TODO: Investigate function
+struct copy_idx_func : public thrust::unary_function<unsigned, unsigned>
+{
+  size_t c;
+  const unsigned *p;
+  copy_idx_func(const size_t _c, const unsigned *_p) : c(_c),p(_p) {};
+  __host__ __device__
+  unsigned operator()(unsigned idx){
+    unsigned myrow = idx/c;
+    unsigned newrow = p[myrow];
+    unsigned mycol = idx%c;
+    return newrow*c+mycol;
+  }
+};
 
 #endif /* SGD_THRUST_CUH_ */

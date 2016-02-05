@@ -3,7 +3,10 @@
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 #include <thrust/sequence.h>
-
+#include <thrust/iterator/permutation_iterator.h>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/iterator/transform_iterator.h>
+#include <thrust/copy.h>
 
 /**
  * Returns the squared loss derivative
@@ -250,5 +253,33 @@ __host__ void calculate_loss_derivative_cublas(
 	cublasDestroy(cnpHandle);
 }
 
+// Permute matrix rows on device
+__host__ void permute_data_and_labels(
+		const thrust_dev_float& data,
+		const thrust_dev_float& labels,
+		const thrust::device_vector<unsigned>& order,
+		thrust_dev_float& permuted_data,
+		thrust_dev_float& permuted_labels,
+		const unsigned R,
+		const unsigned C) {
 
-// TODO: Permute matrix rows on device
+	// TODO: copy_n docs have an error(?): "Generally, for every integer i from 0 to n," should be "to n-1"?
+	// permute the matrix
+	thrust::copy_n(
+		thrust::make_permutation_iterator(
+		  data.begin(),
+		  thrust::make_transform_iterator(
+			thrust::counting_iterator<unsigned>(0),
+			copy_idx_func(C, thrust::raw_pointer_cast(order.data())))),
+		R*C, permuted_data.begin());
+
+	// permute the vector
+	thrust::copy_n(
+		thrust::make_permutation_iterator(
+		  labels.begin(),
+		  thrust::make_transform_iterator(
+			thrust::counting_iterator<unsigned>(0),
+			copy_idx_func(1,thrust::raw_pointer_cast(order.data())))),
+		R, permuted_labels.begin());
+
+}

@@ -8,7 +8,7 @@ LIB	:= -L $(CUDA_HOME)/lib64 -lcudadevrt -lcublas_static -lculibos -lcublas_devi
 NVCCFLAGS := -lineinfo -arch=sm_50 --std=c++11#-g -G --ptxas-options=-v --use_fast_math
 #NVCCFLAGS	:= -lineinfo -arch=sm_35 --std=c++11 #-g -G --ptxas-options=-v --use_fast_math
 
-OBJECTS := main.o sgd_thrust.o sgd_io.o
+OBJECTS := testing.o main.o sgd_thrust.o sgd_io.o
 
 CFLAGS := -Wall -g
 CXXFLAGS := -Wall -Wextra -g --std=c++11 -pedantic
