@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
 	// Start recording
 	cudaEventRecord(start_memory);
 	// The number of threads we allocate per block
-	const int THREADS_PER_BLOCK = batchsize;
+	const int THREADS_PER_BLOCK = 256;
 
 	// Initialize data vector on host
 	thrust_host_float data_h(R * C);
@@ -144,8 +144,7 @@ int main(int argc, char **argv) {
 	cudaEventDestroy(start_memory);
 	cudaEventDestroy(stop_memory);
 
-	cudaEvent_t start;
-	cudaEvent_t stop;
+	cudaEvent_t start, stop;
 
 	// Create the events
 	cudaEventCreate(&start);
@@ -154,7 +153,20 @@ int main(int argc, char **argv) {
 	// Start measuring the event
 	cudaEventRecord(start);
 
+	// Total runtimes for parts of pipeline
+	float shuffle_time = 0.0;
+	float derivative_time = 0.0;
+	float matrix_scale_time = 0.0;
+	float column_sum_time = 0.0;
+	float saxpy_time = 0.0;
+	float total_gradient_time = 0.0;
+
 	for (int epoch = 1; epoch <= MAX_EPOCHS; ++epoch) {
+
+		// Create the events and start recording
+		cudaEvent_t start_shuffle, stop_shuffle;
+		create_events_and_start(start_shuffle, stop_shuffle);
+
 		// We shuffle the data indexes before the start of each epoch on the host, and copy to the GPU
 		std::random_shuffle ( ind_vector.begin(), ind_vector.end());
 		// Currently we are shuffling the indices vector on host and copying to device.
@@ -172,7 +184,14 @@ int main(int argc, char **argv) {
 						labels_shuffled_d,
 						R,
 						C);
+
+		// Record the elapsed time
+		measure_event(start_shuffle, stop_shuffle, shuffle_time, "shuffle_time");
+
 		for (int batch = 0; batch < num_batches; ++batch) {
+			// Create the events and start recording
+			cudaEvent_t start_total_gradient, stop_total_gradient;
+			create_events_and_start(start_total_gradient, stop_total_gradient);
 
 			// Reset gradients and errors
 			thrust::fill(gradients.begin(), gradients.end(), 0.0); // TODO: Necessary?
@@ -181,9 +200,13 @@ int main(int argc, char **argv) {
 
 			// Pointer offsets to be consistent with current batch
 			int offset = batch * batchsize;
-			float * cur_batch_data_ptr = data_shuffled_raw_ptr + offset;
+			float * cur_batch_data_ptr = data_shuffled_raw_ptr + (offset*C);
 			thrust::device_ptr<float> cur_batch_data_dev_ptr(cur_batch_data_ptr);
 			float * cur_batch_labels_ptr = labels_shuffled_raw_ptr + offset;
+
+			// Create the events and start recording
+			cudaEvent_t start_deriv, stop_deriv;
+			create_events_and_start(start_deriv, stop_deriv);
 
 			// Calculate the loss derivative vector
 			calculate_loss_derivative_cublas(
@@ -195,8 +218,14 @@ int main(int argc, char **argv) {
 					C,
 					batchsize);
 
+			// Record the elapsed time
+			measure_event(start_deriv, stop_deriv, derivative_time, "deriv_time");
+
 //			print_vector(loss_derivative, "loss_derivative");
 
+			// Create the events and start recording
+			cudaEvent_t start_scale, stop_scale;
+			create_events_and_start(start_scale, stop_scale);
 			// The gradient matrix is equal to the feature matrix of the batch scaled by the loss derivative vector
 			// TODO: Can we fuse some of the following operations? The column sum and and scaling could be fused no?
 			scale_matrix_rows_by_vector(
@@ -205,69 +234,89 @@ int main(int argc, char **argv) {
 				gradients, // Result stored in gradient matrix of size batchsize*C
 				batchsize,
 				C);
-
+			measure_event(start_scale, stop_scale, matrix_scale_time, "matrix_scale_time");
 //			print_matrix(gradients, "gradients", batchsize, C);
 
 			// Once we have the scaled data matrix, i.e. the gradients we need to sum the columns and scale to get
 			// the avg. gradient vector.
+			// Create the events and start recording
+			cudaEvent_t start_col_sum, stop_col_sum;
+			create_events_and_start(start_col_sum, stop_col_sum);
 			calculate_column_sums(
 				gradients_raw_ptr,
 				col_sums, // col_sums will now contain the sum of the columns in the gradient matrix
 				batchsize,
 				C);
-
+			measure_event(start_col_sum, stop_col_sum, column_sum_time, "col_sum_time");
 //			print_vector(col_sums, "gradients_col_sums");
 			// Scale gradient sum vector to obtain avg. gradient vector
+			// TODO: Timing for this scaling?
 			thrust::for_each(col_sums.begin(), col_sums.end(), _1 / (float)batchsize);
+
+			measure_event(start_total_gradient, stop_total_gradient, total_gradient_time, "total_gradient_time");
 
 			//Update the weight vector
 			float a = -(learning_rate / std::pow(epoch, 0.25));
+
+			// Create the events and start recording
+			cudaEvent_t start_saxpy, stop_saxpy;
+			create_events_and_start(start_saxpy, stop_saxpy);
 
 			// Thrust SAXPY, used to update the weights vector
 			thrust::transform(col_sums.begin(), col_sums.end(),  // input range #1
 					weights.begin(),           // input range #2
 					weights.begin(),           // output range
 					a * _1 + _2);        // placeholder expression
+			measure_event(start_saxpy, stop_saxpy, saxpy_time, "saxpy_time");
 		}
-		if	(epoch % 100 == 0) {
-			thrust::fill(errors.begin(), errors.end(), 0.0);
-			// Calculate the squared error for each data point
-			squared_errors<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
-					data_raw_ptr,
-					labels_raw_ptr,
-					weights_raw_ptr,
-					errors_raw_ptr,
-					R,
-					C);
-			// Reduce/sum the errors
-			float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
-		}
+		// TODO: There has to be something wrong with the calculation now. -> The THREADS_PER_BLOCK must be < 1024!
+//		if	(epoch % 100 == 0) {
+//			thrust::fill(errors.begin(), errors.end(), 0.0);
+//			// Calculate the squared error for each data point
+//			squared_errors<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
+//					data_raw_ptr,
+//					labels_raw_ptr,
+//					weights_raw_ptr,
+//					errors_raw_ptr,
+//					R,
+//					C);
+//			// Reduce/sum the errors
+//			float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
+//		}
 
 	}
 
 
 	// Print final weights and squared error sum
 	// Calculate the squared error for each data point
-	squared_errors<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
-			data_raw_ptr,
-			labels_raw_ptr,
-			weights_raw_ptr,
-			errors_raw_ptr,
-			R,
-			C);
+//	squared_errors<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
+//			data_raw_ptr,
+//			labels_raw_ptr,
+//			weights_raw_ptr,
+//			errors_raw_ptr,
+//			R,
+//			C);
 
 	// Print final quantities
-	float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
-	std::cout << "Squared error sum: " << sq_err_sum << std::endl;
+//	float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
+//	std::cout << "Squared error sum: " << sq_err_sum << std::endl;
 	print_vector(weights, "weights");	
 	
 	// Get the second time
 	cudaEventRecord(stop);
 	cudaEventSynchronize(stop);
-	float miliseconds = 0;
-	cudaEventElapsedTime(&miliseconds, start, stop);
-	printf("kernel time = %f ms\n", miliseconds);
+	float complete_time = 0;
+	cudaEventElapsedTime(&complete_time, start, stop);
 
+
+	printf("shuffle time = %f ms\n", shuffle_time);
+	printf("derivative time = %f ms\n", derivative_time);
+	printf("matrix scale time = %f ms\n", matrix_scale_time);
+	printf("col sum time = %f ms\n", column_sum_time);
+	printf("saxpy time = %f ms\n", saxpy_time);
+
+	printf("total gradient time = %f ms\n", total_gradient_time);
+	printf("overall time = %f ms\n", complete_time);
 
 	cudaEventDestroy(start);
 	cudaEventDestroy(stop);
