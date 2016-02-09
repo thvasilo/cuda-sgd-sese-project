@@ -23,16 +23,23 @@
 /**
  * Container class for an experiment run, holding the timings for the various events.
  * TODO: Add parameter settings to (e.g. dataset name etc.?), creating a nested JSON object?
+ * TODO: I'm currently using this class for both CUBLAS and CUDA experiment output. I should create a class hierarchy instead.
  */
 class ExperimentOutput {
 
 private:
-	float shuffle_time, derivative_time, total_gradient_time, gpu_time, transfer_time;
+	float shuffle_time, total_gradient_time, gpu_time, transfer_time;
 
 public:
-	ExperimentOutput(float _shuffle_time, float  _derivative_time, float  _total_gradient_time, float  _gpu_time, float  _transfer_time):
+	ExperimentOutput():
+		shuffle_time(0.0),
+		total_gradient_time(0.0),
+		gpu_time(0.0),
+		transfer_time(0.0) {}
+
+
+	ExperimentOutput(float _shuffle_time, float  _total_gradient_time, float  _gpu_time, float  _transfer_time):
 		shuffle_time(_shuffle_time),
-		derivative_time(_derivative_time),
 		total_gradient_time(_total_gradient_time),
 		gpu_time(_gpu_time),
 		transfer_time(_transfer_time) {}
@@ -41,7 +48,6 @@ public:
 		Json::Value jsonObj;
 
 		jsonObj["shuffle_time"] = this->shuffle_time;
-		jsonObj["derivative_time"] = this->derivative_time;
 		jsonObj["total_gradient_time"] = this->total_gradient_time;
 		jsonObj["gpu_time"] = this->gpu_time;
 		jsonObj["transfer_time"] = this->transfer_time;

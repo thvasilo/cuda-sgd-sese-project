@@ -49,7 +49,10 @@ main
 .project
 .cproject
 .settings/
-c_code/data/.ptp-sync-folder
+*.ptp-sync-folder
 .ptp-sync/
 *.iml
 .idea/
+
+# Generated data
+/data

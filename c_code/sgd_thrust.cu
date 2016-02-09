@@ -80,13 +80,13 @@ __global__ void calculate_gradients(
 	// TODO: R, C should be device constants
 	// Each data point should get one thread
 	// We want each thread to take one "row" of the matrix and only modify that.
-	cublasHandle_t cnpHandle;
-	cublasStatus_t status = cublasCreate(&cnpHandle);
-
-	if (status != CUBLAS_STATUS_SUCCESS)
-	{
-		printf("Something went wrong with cuBLAS initialization in calculate_gradients\n");
-	}
+//	cublasHandle_t cnpHandle;
+//	cublasStatus_t status = cublasCreate(&cnpHandle);
+//
+//	if (status != CUBLAS_STATUS_SUCCESS)
+//	{
+//		printf("Something went wrong with cuBLAS initialization in calculate_gradients\n");
+//	}
 
 	int thread_index = blockIdx.x * blockDim.x + threadIdx.x; // Should be row index
 
@@ -112,7 +112,7 @@ __global__ void calculate_gradients(
 		}
 	}
 
-	cublasDestroy(cnpHandle);
+//	cublasDestroy(cnpHandle);
 }
 
 /**
@@ -297,11 +297,11 @@ __host__ void calculate_loss_derivative_cublas(
 __host__ void permute_data_and_labels(
 		const thrust_dev_float& data,
 		const thrust_dev_float& labels,
-		const thrust::device_vector<unsigned>& order,
+		const thrust::device_vector<int>& order,
 		thrust_dev_float& permuted_data,
 		thrust_dev_float& permuted_labels,
-		const unsigned R,
-		const unsigned C) {
+		const int R,
+		const int C) {
 
 	// TODO: copy_n docs have an error(?): "Generally, for every integer i from 0 to n," should be "to n-1"?
 	// permute the matrix
@@ -309,7 +309,7 @@ __host__ void permute_data_and_labels(
 		thrust::make_permutation_iterator(
 		  data.begin(),
 		  thrust::make_transform_iterator(
-			thrust::counting_iterator<unsigned>(0),
+			thrust::counting_iterator<int>(0),
 			copy_idx_func(C, thrust::raw_pointer_cast(order.data())))),
 		R*C, permuted_data.begin());
 
@@ -318,7 +318,7 @@ __host__ void permute_data_and_labels(
 		thrust::make_permutation_iterator(
 		  labels.begin(),
 		  thrust::make_transform_iterator(
-			thrust::counting_iterator<unsigned>(0),
+			thrust::counting_iterator<int>(0),
 			copy_idx_func(1,thrust::raw_pointer_cast(order.data())))),
 		R, permuted_labels.begin());
 

@@ -32,7 +32,7 @@ void test_permutation() {
 	thrust_dev_float labels_d = labels_h;
 
 	// Initialize the order vector
-	thrust::device_vector<unsigned> order(R);
+	thrust::device_vector<int> order(R);
 	order[0] = 4;
 	order[1] = 2;
 	order[2] = 0;

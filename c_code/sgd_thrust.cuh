@@ -73,11 +73,11 @@ __host__ void calculate_scaled_col_sums(
 __host__ void permute_data_and_labels(
 		const thrust_dev_float& data,
 		const thrust_dev_float& labels,
-		const thrust::device_vector<unsigned>& order,
+		const thrust::device_vector<int>& order,
 		thrust_dev_float& permuted_data,
 		thrust_dev_float& permuted_labels,
-		const unsigned R,
-		const unsigned C);
+		const int R,
+		const int C);
 
 
 // convert a linear index to a row index
@@ -113,16 +113,16 @@ struct row_index_to_linear_index : public thrust::unary_function<T,T>
 
 // Used to permute matrix/vectors
 // TODO: Investigate function
-struct copy_idx_func : public thrust::unary_function<unsigned, unsigned>
+struct copy_idx_func : public thrust::unary_function<int, int>
 {
   size_t c;
-  const unsigned *p;
-  copy_idx_func(const size_t _c, const unsigned *_p) : c(_c),p(_p) {};
+  const int *p;
+  copy_idx_func(const size_t _c, const int *_p) : c(_c),p(_p) {};
   __host__ __device__
-  unsigned operator()(unsigned idx){
-    unsigned myrow = idx/c;
-    unsigned newrow = p[myrow];
-    unsigned mycol = idx%c;
+  int operator()(int idx){
+    int myrow = idx/c;
+    int newrow = p[myrow];
+    int mycol = idx%c;
     return newrow*c+mycol;
   }
 };
