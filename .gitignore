@@ -45,9 +45,11 @@ main
 *.log
 
 
-# Eclipse/Nsight
+# Eclipse/Nsight/IDEA
 .project
 .cproject
 .settings/
 c_code/data/.ptp-sync-folder
 .ptp-sync/
+*.iml
+.idea/

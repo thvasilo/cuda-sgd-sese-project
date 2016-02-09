@@ -1,6 +1,5 @@
 #include "sgd_io.cuh"
 
-
 void print_vector(const thrust_host_float rowvector, const std::string name) {
 	std::cout << name << " = [ ";
 	for(auto element : rowvector)
@@ -67,6 +66,42 @@ void read_csv(std::string filename, thrust_host_float & data_h, thrust_host_floa
 	assert (data_h.size() == R*C);
 
 	file_stream.close();
+}
+
+/**
+ * Writes a JSON object to a file in the provided filepath.
+ */
+void write_json(Json::Value json_object, std::string filepath) {
+	std::ofstream json_file(filepath);
+
+	Json::StyledWriter styledWriter;
+
+	json_file << styledWriter.write(json_object);
+
+	json_file.close();
+
+}
+
+void write_experiment_output(ExperimentOutput exp, std::string filepath) {
+//	// time_t to string lambda
+//	auto timestr = [](time_t t) -> std::string {
+//	   std::stringstream strm;
+//	   strm << t;
+//	   return strm.str();
+//	};
+//
+//	std::time_t t = std::time(nullptr);
+//	std::string timestamp = timestr(t);
+//	std::string file_with_time = filepath + "-" + timestamp;
+	write_json(exp.toJsonObject(), filepath);
+}
+
+std::string get_filename_from_path(std::string const filepath) {
+	auto pos = filepath.find_last_of('/');
+	auto filename = filepath.substr(pos+1);
+	pos = filename.find_last_of('.');
+	filename = filename.substr(0, pos);
+	return filename;
 }
 
 //__device__ void print_device_vector(const float * vector, const int size, const char* name) {

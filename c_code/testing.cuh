@@ -12,6 +12,8 @@ void test_permutation();
 
 void test_col_sums();
 
+void test_col_sum_and_scale();
+
 void test_matrix_scale();
 
 void test_gemv();

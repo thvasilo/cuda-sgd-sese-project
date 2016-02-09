@@ -8,7 +8,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/device_ptr.h>
 
-
+using namespace thrust::placeholders;
 
 void test_permutation() {
 	const int R = 5;
@@ -91,6 +91,56 @@ void test_col_sums() {
 
 	thrust_host_float col_sums_h = col_sums;
 	print_vector(col_sums_h, "column_sums");
+}
+
+void test_col_sum_and_scale() {
+	const int R = 5;
+	const int C = 4;
+	const float scaling_factor = 2.0;
+
+	// Initialize data vector on host
+	thrust_host_float data_h(R * C);
+
+	// Initialize labels vector on host
+	thrust_host_float labels(R);
+
+	std::string filename = "data/col_sum_test.csv";
+	// Read data from csv file into host vectors
+	read_csv(filename, data_h, labels, R, C);
+
+	print_matrix(data_h, "data_h", R, C);
+
+	// Copy data from host vectors to device
+	thrust_dev_float data_d = data_h;
+	float* data_dev_ptr = thrust::raw_pointer_cast(data_d.data());
+
+	// Initialize the column sum vector
+	thrust_dev_float col_sums(C);
+
+	calculate_column_sums(
+			data_dev_ptr,
+			col_sums,
+			R,
+			C);
+
+	thrust_host_float col_sums_h = col_sums;
+	print_vector(col_sums_h, "column_sums");
+
+	// Scale the column sums
+	thrust::for_each(col_sums.begin(), col_sums.end(), _1 / scaling_factor);
+	col_sums_h = col_sums;
+	print_vector(col_sums_h, "scaled_column_sums");
+
+	// Perform the fused column sum and scale
+	calculate_scaled_col_sums(
+		data_dev_ptr,
+		col_sums, // col_sums will now contain the sum of the columns in the gradient matrix, scaled by 1/batchsize
+		R,
+		C,
+		scaling_factor);
+
+	col_sums_h = col_sums;
+	print_vector(col_sums_h, "fused_scaled_column_sums");
 }
 
 void test_matrix_scale() {

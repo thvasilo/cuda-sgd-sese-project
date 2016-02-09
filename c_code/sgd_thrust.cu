@@ -173,6 +173,46 @@ __host__ void calculate_column_sums(
 		sum_functor(R, C, array));
 }
 
+// Summation functor used for the column sum operation
+struct sum_and_scale_functor
+{
+  int R;
+  int C;
+  const float *arr;
+  float a;
+
+  sum_and_scale_functor(int _R, int _C, float _a, const float *_arr) : R(_R), C(_C), a(_a), arr(_arr) {};
+
+  __host__ __device__
+  float operator()(int myC){
+	  float sum = 0.0;
+	  for (int i = 0; i < R; ++i) {
+		  sum += arr[i*C+myC];
+	  }
+	return sum/a;
+	}
+};
+
+/**
+ * Calculates the sum of each column in array (of size R*C) and stores it in col_sums.
+ */
+__host__ void calculate_scaled_col_sums(
+		const float * array,
+		thrust_dev_float& col_sums,
+		const int R,
+		const int C,
+		const float scaling_factor) {
+
+	// Need to initially set the elements of the sums vector to a sequence, since they represent the indices.
+	thrust::sequence(col_sums.begin(), col_sums.end());
+	// Perform the sum column transformation
+	thrust::transform(
+		col_sums.begin(),
+		col_sums.end(),
+		col_sums.begin(),
+		sum_and_scale_functor(R, C, scaling_factor, array));
+}
+
 /**
  * For an RxC matrix and a vector of size R, scales each element in each row of the matrix
  * by the corresponding element in the scaling_vector.

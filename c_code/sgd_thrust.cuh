@@ -63,6 +63,13 @@ __host__ void calculate_column_sums(
 		const int R,
 		const int C);
 
+__host__ void calculate_scaled_col_sums(
+		const float * array,
+		thrust_dev_float& col_sums,
+		const int R,
+		const int C,
+		const float scaling_factor);
+
 __host__ void permute_data_and_labels(
 		const thrust_dev_float& data,
 		const thrust_dev_float& labels,

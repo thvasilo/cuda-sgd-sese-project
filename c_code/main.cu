@@ -40,14 +40,13 @@ int iDivUp(int a, int b){ return ((a % b) != 0) ? (a / b + 1) : (a / b); }
 int main(int argc, char **argv) {
 
 //	test_permutation();
-//
-//	return 0;
 
 //	test_gemv();
 //
 //	test_matrix_scale();
 //
 //	test_col_sums();
+//	test_col_sum_and_scale();
 //
 //	return 0;
 
@@ -59,7 +58,7 @@ int main(int argc, char **argv) {
 
 	float learning_rate = atof(argv[1]);
 	const int MAX_EPOCHS = atoi(argv[2]);
-	const std::string filename = argv[3];
+	const std::string filepath = argv[3];
 	const int R = atoi(argv[4]);
 	const int C = atoi(argv[5]);
 	const int batchsize = (atoi(argv[6])  == 0) ? R : atoi(argv[6]);
@@ -84,7 +83,7 @@ int main(int argc, char **argv) {
 	thrust_host_float labels_h(R);
 
 	// Read data from csv file into host vectors
-	read_csv(filename, data_h, labels_h, R, C);
+	read_csv(filepath, data_h, labels_h, R, C);
 
 	// Copy data from host vectors to device
 	// note: d_vec.data() returns a device_ptr
@@ -137,9 +136,9 @@ int main(int argc, char **argv) {
 	// Now measure the differences
 	cudaEventRecord(stop_memory);
 	cudaEventSynchronize(stop_memory);
-	float miliseconds_memory = 0;
-	cudaEventElapsedTime(&miliseconds_memory, start_memory, stop_memory);
-	printf("Memory time = %f ms\n", miliseconds_memory);
+	float transfer_time = 0;
+	cudaEventElapsedTime(&transfer_time, start_memory, stop_memory);
+	printf("Memory time = %f ms\n", transfer_time);
 
 	cudaEventDestroy(start_memory);
 	cudaEventDestroy(stop_memory);
@@ -226,7 +225,7 @@ int main(int argc, char **argv) {
 			// Create the events and start recording
 			cudaEvent_t start_scale, stop_scale;
 			create_events_and_start(start_scale, stop_scale);
-			// The gradient matrix is equal to the feature matrix of the batch scaled by the loss derivative vector
+			// The gradient matrix is equal to the feature matrix of the batch scaled row/element-wise by the loss derivative vector.
 			// TODO: Can we fuse some of the following operations? The column sum and and scaling could be fused no?
 			scale_matrix_rows_by_vector(
 				cur_batch_data_dev_ptr,
@@ -242,16 +241,15 @@ int main(int argc, char **argv) {
 			// Create the events and start recording
 			cudaEvent_t start_col_sum, stop_col_sum;
 			create_events_and_start(start_col_sum, stop_col_sum);
-			calculate_column_sums(
+			calculate_scaled_col_sums(
 				gradients_raw_ptr,
-				col_sums, // col_sums will now contain the sum of the columns in the gradient matrix
+				col_sums, // col_sums will now contain the sum of the columns in the gradient matrix, scaled by 1/batchsize
 				batchsize,
-				C);
+				C,
+				float(1.0)); // Should be batchsize
+			// TODO: DAFAQ: Why does it still converge (and much faster) when I don't scale by the batch size?
 			measure_event(start_col_sum, stop_col_sum, column_sum_time, "col_sum_time");
 //			print_vector(col_sums, "gradients_col_sums");
-			// Scale gradient sum vector to obtain avg. gradient vector
-			// TODO: Timing for this scaling?
-			thrust::for_each(col_sums.begin(), col_sums.end(), _1 / (float)batchsize);
 
 			measure_event(start_total_gradient, stop_total_gradient, total_gradient_time, "total_gradient_time");
 
@@ -305,8 +303,8 @@ int main(int argc, char **argv) {
 	// Get the second time
 	cudaEventRecord(stop);
 	cudaEventSynchronize(stop);
-	float complete_time = 0;
-	cudaEventElapsedTime(&complete_time, start, stop);
+	float gpu_time = 0;
+	cudaEventElapsedTime(&gpu_time, start, stop);
 
 
 	printf("shuffle time = %f ms\n", shuffle_time);
@@ -316,7 +314,12 @@ int main(int argc, char **argv) {
 	printf("saxpy time = %f ms\n", saxpy_time);
 
 	printf("total gradient time = %f ms\n", total_gradient_time);
-	printf("overall time = %f ms\n", complete_time);
+	printf("overall time = %f ms\n", gpu_time);
+
+	// Write timing to JSON file
+	ExperimentOutput exp = ExperimentOutput(shuffle_time, derivative_time, total_gradient_time, gpu_time, transfer_time);
+	std::string filename = get_filename_from_path(filepath);
+	write_experiment_output(exp, filename + "-output.json");
 
 	cudaEventDestroy(start);
 	cudaEventDestroy(stop);
