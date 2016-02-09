@@ -40,7 +40,7 @@ def create_scalable_data_sets(n_samples, n_features, data_subsets_sizes,
         to_save[:, -1] = labels[:data_size]
 
         # File destination
-        filename_data = filename + str(data_size) + '.csv'
+        filename_data = filename + '-' + str(data_size) + '.csv'
 
         # Save data
         with open(filename_data, 'wb') as fp:
@@ -56,17 +56,17 @@ def create_scalable_data_sets(n_samples, n_features, data_subsets_sizes,
     return data, labels, w
 
 def main():
-    
+
     # Parameters
-    n_samples = 10000
-    n_features = 3
+    n_samples = 100000
+    n_features = 1000
     noise = 0.0
     seed = 42
 
-    jump = 500
-    start = 1000
+    jump = 50000
+    start = 50000
     data_subsets_sizes = np.arange(start, n_samples + jump, jump)
-    filename = './test_number_of_samples'
+    filename = './test_number_of_samples_large'
 
     create_scalable_data_sets(n_samples, n_features,
                               data_subsets_sizes, noise, filename, seed)
