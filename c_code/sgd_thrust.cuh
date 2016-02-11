@@ -79,6 +79,13 @@ __host__ void permute_data_and_labels(
 		const int R,
 		const int C);
 
+__host__ float calculate_avg_loss_cublas(
+	const float * data_array_d,
+	const float * label_vector_d,
+	const float * weights_d,
+	float * loss,
+	const int R,
+	const int C);
 
 // convert a linear index to a row index
 template <typename T>

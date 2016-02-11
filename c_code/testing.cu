@@ -10,6 +10,54 @@
 
 using namespace thrust::placeholders;
 
+void test_abs_error() {
+	const int R = 5;
+	const int C = 4;
+	const int batchsize = 5;
+
+	// Initialize data vector on host
+	thrust_host_float data_h(R * C);
+
+	// Initialize labels vector on host
+	thrust_host_float labels_h(R);
+
+	std::string filename = "data/gemv_test";
+	// Read data from csv file into host vectors
+	read_csv(filename, data_h, labels_h, R, C);
+
+	print_matrix(data_h, "data_h", R, C);
+
+
+	// Copy data from host vectors to device
+	// The data matrix has all elements equal to their row index + 1
+	thrust_dev_float data_d = data_h;
+	const float * data_raw_ptr = thrust::raw_pointer_cast(data_d.data());
+	// All the labels are 4.0
+	thrust_dev_float labels_d = labels_h;
+	const float * labels_raw_ptr = thrust::raw_pointer_cast(labels_d.data());
+
+	// Initialize weights to 1
+	thrust_dev_float weights(C);
+	thrust::fill(weights.begin(), weights.end(), 1.0);
+	float * weights_raw_ptr = thrust::raw_pointer_cast(weights.data());
+
+	print_vector(weights, "weights");
+	print_vector(labels_h, "labels_h");
+	// Initialize loss derivative vector
+	thrust_dev_float loss_derivative(batchsize);
+	float * loss_raw_ptr = thrust::raw_pointer_cast(loss_derivative.data());
+
+	float avg_abs_loss = calculate_avg_loss_cublas(
+		data_raw_ptr,
+		labels_raw_ptr,
+		weights_raw_ptr,
+		loss_raw_ptr,
+		R,
+		C);
+
+	std::cout << "Average absolute loss (8.0 expected): " << avg_abs_loss << std::endl;
+}
+
 void test_permutation() {
 	const int R = 5;
 	const int C = 4;

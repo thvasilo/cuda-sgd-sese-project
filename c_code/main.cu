@@ -48,6 +48,9 @@ struct CuBLASTimings {
 	float total_gradient_time = 0.0;
 };
 
+/**
+ * One iteration (epoch) of SGD using plain CUDA calls
+ */
 void cuda_iteration(
 	CudaTimings* timings,
 	std::vector<int>& ind_vector,
@@ -82,7 +85,6 @@ void cuda_iteration(
 	create_events_and_start(start_shuffle, stop_shuffle);
 
 	// We shuffle the data indexes before the start of each epoch
-	// TODO: How is performance if we shuffle the data instead of indices, i.e. having sequential accesses instead of random?
 	std::random_shuffle ( ind_vector.begin(), ind_vector.end());
 	batch_indices = ind_vector; // TODO: Remove host-device copy, can we shuffle on the GPU instead?
 
@@ -158,6 +160,9 @@ void cuda_iteration(
 
 }
 
+/**
+ * One iteration (epoch) of SGD using cuBLAS calls.
+ */
 void cublas_iteration(
 		CuBLASTimings* timings,
 		thrust_dev_float& data_d,
@@ -268,7 +273,7 @@ void cublas_iteration(
 		// TODO: DAFAQ: Why does it still converge (and much faster) when I don't scale by the batch size?
 		measure_event(start_col_sum, stop_col_sum, column_sum_time, "col_sum_time");
 
-		// Gradient calcuation finished
+		// Gradient calculation finished
 		measure_event(start_total_gradient, stop_total_gradient, total_gradient_time, "total_gradient_time");
 
 		//Update the weight vector
@@ -293,15 +298,18 @@ void cublas_iteration(
 	}
 }
 
-// Usage: Run with all arguments:
-// args: [learning_rate] [iterations] [data_csv_file] [num_rows] [num_features] [batchsize] [cudaRun]
-// Setting batchsize to 0 uses the full data at each iteration
-// The argument [cudaRun] determines if we should use the plain CUDA or the cuBLAS code for the iterations.
-// Set to 1 for a plain CUDA run, 0 for a cuBLAS run.
-// NB: We are assuming that the csv has the format [features],[label]
-// i.e. the last column is the label, and all others are features.
-// num_features should equal the number of features only, i.e. the number of columns in the csv minus 1
-// e.g.: > ./main 0.00001 10 data/5xy.csv 40 1 0 0
+/** Usage: Run with all arguments: [learning_rate] [iterations] [data_csv_file] [num_rows] [num_features] [batchsize] [cudaRun]
+ *
+ * Setting batchsize to 0 uses the full data at each iteration.
+ * The argument [cudaRun] determines if we should use the plain CUDA or the cuBLAS code for the iterations.
+ * Set to 1 for a plain CUDA run, 0 for a cuBLAS run.
+ * NB: We are assuming that the csv has the format [features],[label]
+ * i.e. the last column is the label, and all others are features.
+ * num_features should equal the number of features only, i.e. the number of columns in the csv minus 1
+ * e.g.: > ./main 0.00001 10 data/5xy.csv 40 1 0 0
+ * will do a run with learning rate 0.00001 for 10 epochs, on the dataset data/5xy.csv, which has 40 rows and 1 feature column,
+ * using the complete data as a single batch and use the cuBLAS codepath for the iterations.
+**/
 int main(int argc, char **argv) {
 
 //	test_permutation();
@@ -313,6 +321,7 @@ int main(int argc, char **argv) {
 //	test_col_sums();
 //	test_col_sum_and_scale();
 //
+//	test_abs_error();
 //	return 0;
 
 	if	(argc != 8) {
@@ -335,13 +344,7 @@ int main(int argc, char **argv) {
 
 	cudaEvent_t start_memory;
 	cudaEvent_t stop_memory;
-
-	// Create the events
-	cudaEventCreate(&start_memory);
-	cudaEventCreate(&stop_memory);
-
-	// Start recording
-	cudaEventRecord(start_memory);
+	create_events_and_start(start_memory, stop_memory);
 
 	// Initialize data vector on host
 	thrust_host_float data_h(R * C);
@@ -380,7 +383,7 @@ int main(int argc, char **argv) {
 	thrust_dev_float errors(R);
 	float * errors_raw_ptr = thrust::raw_pointer_cast(errors.data());
 
-	// Allocate storage for row sums and indices
+	// Allocate storage for column sums and indices
 	thrust_dev_float col_sums(C);
 
 	// Allocate storage for matrix and vector shuffled copies.
@@ -390,7 +393,7 @@ int main(int argc, char **argv) {
 	float * labels_shuffled_raw_ptr = thrust::raw_pointer_cast(labels_shuffled_d.data());
 
 	// Initialize batch indices vector
-	thrust::device_vector<int> batch_indices_d(R);
+	thrust_dev_int batch_indices_d(R);
 	// Fill indices vector, we first create and index vector, shuffle it and copy to device vector
 	std::vector<int> ind_vector(R);
 	for (int i = 0; i < R; ++i) {
@@ -400,32 +403,23 @@ int main(int argc, char **argv) {
 	batch_indices_d = ind_vector;
 
 	// Initialize batch indices vector
-	thrust_dev_int batch_indices(R);
-	int * batch_indices_ptr = thrust::raw_pointer_cast(batch_indices.data());
-	// Copy the indices vector to the device
-	batch_indices = ind_vector;
+	int * batch_indices_ptr = thrust::raw_pointer_cast(batch_indices_d.data());
 
 	// Allocate storage for row sums and indices (used for plain CUDA iterations)
 	thrust_dev_float row_sums(C);
 	thrust_dev_int row_indices(C);
 
-	// Now measure the differences
+	// Record the data transfer time
 	cudaEventRecord(stop_memory);
 	cudaEventSynchronize(stop_memory);
 	float transfer_time = 0;
 	cudaEventElapsedTime(&transfer_time, start_memory, stop_memory);
-
 	cudaEventDestroy(start_memory);
 	cudaEventDestroy(stop_memory);
 
+	// Record the GPU time
 	cudaEvent_t start, stop;
-
-	// Create the events
-	cudaEventCreate(&start);
-	cudaEventCreate(&stop);
-	
-	// Start measuring the event
-	cudaEventRecord(start);
+	create_events_and_start(start, stop)
 
 	// Create timing objects on heap (remember to destroy!)
 	CuBLASTimings* cublasTimings = new CuBLASTimings();
@@ -434,31 +428,32 @@ int main(int argc, char **argv) {
 	for (int epoch = 1; epoch <= MAX_EPOCHS; ++epoch) {
 
 		if (!cudaRun) {
+			// Perform an iteration using the cuBLAS codepath
 			cublas_iteration(
-					cublasTimings,
-			        data_d,
-			        labels_d,
-			        data_shuffled_d,
-			        labels_shuffled_d,
-			        gradients,
-			        weights,
-			        loss_derivative,
-			        col_sums,
-			        ind_vector,
-			        batch_indices_d,
-			        data_raw_ptr,
-			        labels_raw_ptr,
-			        weights_raw_ptr,
-			        loss_derivative_raw_ptr,
-			        gradients_raw_ptr,
-			        learning_rate,
-			        epoch,
-			        num_batches,
-			        batchsize,
-			        R,
-			        C
-			        );
+				cublasTimings,
+				data_d,
+				labels_d,
+				data_shuffled_d,
+				labels_shuffled_d,
+				gradients,
+				weights,
+				loss_derivative,
+				col_sums,
+				ind_vector,
+				batch_indices_d,
+				data_raw_ptr,
+				labels_raw_ptr,
+				weights_raw_ptr,
+				loss_derivative_raw_ptr,
+				gradients_raw_ptr,
+				learning_rate,
+				epoch,
+				num_batches,
+				batchsize,
+				R,
+				C);
 		} else {
+			// Perform an iteration using the plain CUDA codepath
 			cuda_iteration(
 			    cudaTimings,
 			    ind_vector,
@@ -466,7 +461,7 @@ int main(int argc, char **argv) {
 			    weights,
 			    row_sums,
 			    row_indices,
-			    batch_indices,
+			    batch_indices_d,
 			    data_raw_ptr,
 			    labels_raw_ptr,
 			    weights_raw_ptr,
@@ -478,8 +473,7 @@ int main(int argc, char **argv) {
 			    num_batches,
 			    batchsize,
 			    R,
-			    C
-			    );
+			    C);
 		}
 
 
@@ -515,7 +509,7 @@ int main(int argc, char **argv) {
 	printf("Data transfer time = %f ms\n", transfer_time);
 	printf("GPU time = %f ms\n", gpu_time);
 
-	// Write timing to JSON file
+	// Write timings to JSON file
 	ExperimentOutput exp;
 	std::string filename = get_filename_from_path(filepath);
 	if (!cudaRun) {
@@ -545,6 +539,19 @@ int main(int argc, char **argv) {
 
 	print_vector(weights, "weights");
 
+	// Initialize loss derivative vector
+	thrust_dev_float loss_vector(R);
+	float * loss_raw_ptr = thrust::raw_pointer_cast(loss_vector.data());
+
+	float avg_abs_loss = calculate_avg_loss_cublas(
+			data_raw_ptr,
+			labels_raw_ptr,
+			weights_raw_ptr,
+			loss_raw_ptr,
+			R,
+			C);
+
+	std::cout << "Average absolute loss : " << avg_abs_loss << std::endl;
 
 	// Cleanup
 	cudaEventDestroy(start);

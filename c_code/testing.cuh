@@ -18,6 +18,6 @@ void test_matrix_scale();
 
 void test_gemv();
 
-
+void test_abs_error();
 
 #endif /* TESTING_CUH_ */

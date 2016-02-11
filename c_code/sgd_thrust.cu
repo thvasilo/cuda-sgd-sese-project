@@ -67,6 +67,65 @@ __global__ void squared_errors(
 }
 
 /**
+ * Calculates the average absolute loss using cuBLAS calls
+ */
+__host__ float calculate_avg_loss_cublas(
+	const float * data_array_d,
+	const float * label_vector_d,
+	const float * weights_d,
+	float * loss,
+	const int R,
+	const int C) {
+	// Set up cuBLAS environment
+	cublasHandle_t cnpHandle;
+	cublasStatus_t status = cublasCreate(&cnpHandle);
+
+	// We copy the labels into the loss derivative vector, since the gemv operation below is destructive for
+	// the destination vector
+	cublasScopy(
+			cnpHandle,
+			R,
+			label_vector_d, 1,
+			loss, 1);
+
+	const float alpha = 1.0;
+	const float a_minus = -1.0;
+
+	// To use gemv with row-major matrices we enter reverse values for rows and columns, take the transpose
+	// of the matrix and assign the number of columns as the leading dimension
+	// See http://peterwittek.com/cublas-matrix-c-style.html and http://stackoverflow.com/q/21164373/209882
+	status = cublasSgemv(
+		cnpHandle,
+		CUBLAS_OP_T,
+		C, // Set the num of columns as the number of rows in the matrix
+		R, // Set the num of rows as the number of columns in the matrix
+		&alpha,
+		data_array_d,
+		C, // We set the leading dimension for data_array to be the number of cols, since we are using C-style row-major arrays.
+		weights_d,
+		1,
+		&a_minus,
+		loss, // The result of the calculation is stored in the loss derivative vector
+		1);
+	// Check if the gemv operation was successful
+	if (status != CUBLAS_STATUS_SUCCESS) {
+		    std::cerr << "WARNING: Failed to execute the gemv in calculate_avg_loss_cublas!\n";
+	}
+
+	float error_sum = 0.0;
+
+	status = cublasSasum_v2(cnpHandle, R, loss, 1, &error_sum);
+	if (status != CUBLAS_STATUS_SUCCESS) {
+			    std::cerr << "WARNING: Failed to execute the asum in calculate_avg_loss_cublas!\n";
+	}
+
+	// Clean up cuBLAS environment
+	cublasDestroy(cnpHandle);
+
+	return error_sum/R;
+}
+
+/**
  * Calculates the weight gradients for each data point in the batch
  */
 __global__ void calculate_gradients(
