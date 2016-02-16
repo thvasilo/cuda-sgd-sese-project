@@ -6,7 +6,9 @@ from __future__ import print_function
 import numpy as np
 from sklearn.datasets import make_regression
 import csv
-import sys, getopt
+import sys
+import getopt
+
 
 def create_data_set(n_samples, n_features, noise=0, filename='./test', seed=42):
     """
@@ -61,6 +63,7 @@ def create_data_set(n_samples, n_features, noise=0, filename='./test', seed=42):
 
 def usage():
     print(["--samples", "--features", "--noise", "--filename", "--seed"])
+
 
 def main(argv):
     # Parameters

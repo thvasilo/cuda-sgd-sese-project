@@ -323,7 +323,7 @@ int main(int argc, char **argv) {
 //	test_col_sums();
 //	test_col_sum_and_scale();
 //
-	test_abs_error();
+//	test_abs_error();
 
 //	check_transfer_speed();
 

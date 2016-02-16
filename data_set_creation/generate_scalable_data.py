@@ -1,25 +1,17 @@
-"""
-This should generate one big data set. The program should save
-smaller pieces of the initial data set as separated data sets
-to test scalability.
-"""
-
 from __future__ import print_function
 import numpy as np
 from sklearn.datasets import make_regression
 import csv
 
 
-def create_scalable_data_sets(n_samples, n_features, data_subsets_sizes,
-                              noise=0, filename='./test', seed=42):
+def create_scalable_data_sets(n_samples, n_features, data_subsets_sizes,noise, filename, seed):
     """
     This is a generalization of the create data function. This first creates
-    a big data set of n_samples and then takes samller samples from it of the
+    a big data set of n_samples and then takes smaller samples from it of the
     sizes provided in the data_subset_sizes vector.
     """
 
-    # Change this for reproducibility issues
-    prng = np.random.RandomState(seed)
+    prng = np.random.RandomState(seed) if seed != 0 else np.random.RandomState()
 
     # Generate data
     n_informative = n_features  # All feature are informative
@@ -55,21 +47,35 @@ def create_scalable_data_sets(n_samples, n_features, data_subsets_sizes,
 
     return data, labels, w
 
-def main():
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description="Script to create a number of csv files for testing scaling"
+                                                 "in terms of number of data points")
+    parser.add_argument("--start", help="Starting point for the number of samples", type=int,
+                        required=True)
+    parser.add_argument("--end", help="Ending point (inclusive) for the number of samples", type=int,
+                        required=True)
+    parser.add_argument("--stride", help="Stride for the number of samples", type=int,
+                        required=True)
+    parser.add_argument("--features", help="Number of features the dataset should contain", type=int,
+                        required=True)
+    parser.add_argument("--seed", help="Seed to easy replication of data generation", type=int,
+                        default=0)
+    parser.add_argument("--noise", help="Amount of noise to add to the generated data", type=float,
+                        default=0.0)
+
+    args = parser.parse_args()
 
     # Parameters
-    n_samples = 100000
-    n_features = 1000
-    noise = 0.0
-    seed = 42
+    n_samples = args.end
+    n_features = args.features
+    noise = args.noise
+    seed = args.seed
 
-    jump = 50000
-    start = 50000
+    jump = args.stride
+    start = args.start
     data_subsets_sizes = np.arange(start, n_samples + jump, jump)
-    filename = './test_number_of_samples_large'
+    filename = './test_number_of_samples_scalable'
 
     create_scalable_data_sets(n_samples, n_features,
                               data_subsets_sizes, noise, filename, seed)
-
-if __name__ == '__main__':
-    main()

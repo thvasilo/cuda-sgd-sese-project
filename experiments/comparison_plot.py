@@ -120,7 +120,7 @@ if __name__ == '__main__':
         sub.set_title(title)
         sub.set_xlabel(x_label)
         sub.set_ylabel(y_label)
-        sub.legend([args.Aname, args.Bname], loc='lower right')
+        sub.legend([args.Aname, args.Bname], loc='upper left')
 
         fig.tight_layout()
         fig.savefig(filepath, frameon=frameon,
