@@ -1,14 +1,9 @@
-"""
-This script generates the data sets for tests scalability
-of the features. 
-"""
-
 from __future__ import print_function
 from generate_data import create_data_set
 import numpy as np
 
-def generate_data_for_features(n_samples, vector_of_number_of_features, noise=0, 
-                               filename='./test', seed=42):
+
+def generate_data_for_features(n_samples, feature_sizes_vector, noise, filename, seed):
     """
     This function will produce and save a set of data sets to
     test the scalability with features. In order to do so the
@@ -21,19 +16,43 @@ def generate_data_for_features(n_samples, vector_of_number_of_features, noise=0,
     respectively.
     """
 
-    for n_features in vector_of_number_of_features:
+    for n_features in feature_sizes_vector:
         name = filename + str(n_features)
         create_data_set(n_samples, n_features, noise, name, seed)
         
 
 def main():
-    n_samples = 10000
-    noise = 0.0
-    filename = './features_scalability'
-    feature_vector = np.arange(2, 16, 1)
+    import argparse
+    parser = argparse.ArgumentParser(description="Script to create a number of csv files for testing scaling"
+                                                 "in terms of number of data points")
+    parser.add_argument("--start", help="Starting point for the number of samples", type=int,
+                        required=True)
+    parser.add_argument("--end", help="Ending point (inclusive) for the number of samples", type=int,
+                        required=True)
+    parser.add_argument("--stride", help="Stride for the number of samples", type=int,
+                        required=True)
+    parser.add_argument("--samples", help="Number of features the dataset should contain", type=int,
+                        required=True)
+    parser.add_argument("--seed", help="Seed to easy replication of data generation", type=int,
+                        default=0)
+    parser.add_argument("--noise", help="Amount of noise to add to the generated data", type=float,
+                        default=0.0)
+
+    args = parser.parse_args()
+
+    # Parameters
+    max_features = args.end
+    n_samples = args.samples
+    noise = args.noise
+    seed = args.seed
+
+    jump = args.stride
+    start = args.start
+    feature_sizes_vector = np.arange(start, max_features + jump, jump)
+    filename = './test_number_of_features-'
 
     # Call the function
-    generate_data_for_features(n_samples, feature_vector, noise, filename)
+    generate_data_for_features(n_samples, feature_sizes_vector, noise, filename, seed)
 
 
 if __name__ == '__main__':

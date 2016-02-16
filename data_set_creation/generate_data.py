@@ -10,7 +10,7 @@ import sys
 import getopt
 
 
-def create_data_set(n_samples, n_features, noise=0, filename='./test', seed=42):
+def create_data_set(n_samples, n_features, noise, filename, seed):
     """
     Creates data from a linear model and the model. The model has n_features
     and n_samples. The level of noise can be controled with the noise comand
@@ -19,7 +19,7 @@ def create_data_set(n_samples, n_features, noise=0, filename='./test', seed=42):
     """
 
     # Change this for reproducibility issues
-    prng = np.random.RandomState(seed)
+    prng = np.random.RandomState(seed) if seed != 0 else np.random.RandomState()
 
     # Generate data
     n_informative = n_features  # All feature are informative

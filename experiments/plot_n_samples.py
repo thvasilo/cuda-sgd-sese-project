@@ -4,6 +4,7 @@ import matplotlib
 import numpy as np
 import json
 import os
+import sys
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
@@ -42,6 +43,8 @@ if __name__ == '__main__':
     parser.add_argument("-e", "--epochs", help="Number of epochs to run", type=int, default=10)
     # We are assuming execution from <repo-root>/experiments/experiment_folder
     parser.add_argument("--cmd", help="Command to run", type=str, default='../../c_code/main')
+    parser.add_argument("--paramName", help="Name of the parameter we are investigating", type=str, required=True,
+                        choices=["features", "samples"])
 
     args = parser.parse_args()
 
@@ -54,7 +57,6 @@ if __name__ == '__main__':
     base_name = args.prefix  # 'test_number_of_samples'
     full_path = base_path + base_name
     batch_size = args.batchsize
-    C = args.columns   # TODO: Determine from args whether to run n_samples experiment or n_features
     cuda_run = args.cuda  # When set to 1 to perform a run with the CUDA codepath instead of the cuBLAS
 
     # Initialize lists to store
@@ -70,16 +72,26 @@ if __name__ == '__main__':
     jump = args.stride
     data_subsets_sizes = np.arange(start, n_samples + jump, jump)
 
-    # Now we run the process
-    for R in data_subsets_sizes:
+    if args.columns == -1 and args.paramName == "samples":
+        print("Error: Need to provide --columns argument when --paramName is set to \'samples\'")
+        sys.exit(1)
+    if args.rows == -1 and args.paramName == "features":
+        print("Error: Need to provide --rows argument when --paramName is set to \'features\'")
+        sys.exit(1)
+
+    # Run the process for each parameter setting
+    for parameter in data_subsets_sizes:
+        R = args.rows if args.paramName == "features" else parameter
+        C = args.columns if args.paramName == "samples" else parameter
         print('Number of data points: ', R)
-        json_filename = base_name + str(R)
-        dataset = full_path + str(R) + '.csv'
+        print('Number of features: ', C)
+        json_filename = base_name + str(parameter)
+        dataset = full_path + str(parameter) + '.csv'
         print('Data set filepath: ', dataset)
 
-        parameters = [learning_rate, iterations, dataset, R, C, batch_size, cuda_run]
-        parameters = [str(par) for par in parameters]
-        run_line = [cmd] + parameters
+        run_parameters = [learning_rate, iterations, dataset, R, C, batch_size, cuda_run]
+        run_parameters = [str(par) for par in run_parameters]
+        run_line = [cmd] + run_parameters
         # Run the command with the main CUDA program
         print("Running cmd: {}".format(run_line))
         p = Popen(run_line)
@@ -130,25 +142,25 @@ if __name__ == '__main__':
     create_plot(
             data_subsets_sizes,
             kernel_times,
-            filename='gpu_time_n_samples',
-            title='GPU running time scaling with the number of samples',
-            x_label='Num. samples',
+            filename='gpu_time_n_{}'.format(args.paramName),
+            title='GPU running time scaling with the number of {}'.format(args.paramName),
+            x_label='Num. {}'.format(args.paramName),
             y_label='GPU Time (ms)')
 
     # Plot transfer times
     create_plot(
             data_subsets_sizes,
             memory_times,
-            filename='transfer_time_n_samples',
-            title='Data read + transfer time scaling with the number of samples',
-            x_label='Num. samples',
+            filename='transfer_time_n_{}'.format(args.paramName),
+            title='Data read + transfer time scaling with the number of {}'.format(args.paramName),
+            x_label='Num. {}'.format(args.paramName),
             y_label='Data read + transfer time (ms)')
 
     # Plot errors
     create_plot(
             data_subsets_sizes,
             errors,
-            filename='error_n_samples',
-            title='Mean absolute error scaling with the number of samples',
-            x_label='Num. samples',
+            filename='error_n_{}'.format(args.paramName),
+            title='Mean absolute error scaling with the number of {}'.format(args.paramName),
+            x_label='Num. {}'.format(args.paramName),
             y_label='Mean Absolute Error')

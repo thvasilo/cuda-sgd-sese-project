@@ -56,3 +56,6 @@ main
 
 # Generated data
 /data
+
+# Python generated
+*.pyc
