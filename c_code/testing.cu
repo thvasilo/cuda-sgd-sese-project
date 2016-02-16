@@ -13,7 +13,6 @@ using namespace thrust::placeholders;
 void test_abs_error() {
 	const int R = 5;
 	const int C = 4;
-	const int batchsize = 5;
 
 	// Initialize data vector on host
 	thrust_host_float data_h(R * C);
@@ -26,7 +25,6 @@ void test_abs_error() {
 	read_csv(filename, data_h, labels_h, R, C);
 
 	print_matrix(data_h, "data_h", R, C);
-
 
 	// Copy data from host vectors to device
 	// The data matrix has all elements equal to their row index + 1
@@ -43,19 +41,15 @@ void test_abs_error() {
 
 	print_vector(weights, "weights");
 	print_vector(labels_h, "labels_h");
-	// Initialize loss derivative vector
-	thrust_dev_float loss_derivative(batchsize);
-	float * loss_raw_ptr = thrust::raw_pointer_cast(loss_derivative.data());
 
-	float avg_abs_loss = calculate_avg_loss_cublas(
+	float avg_abs_loss = calculate_mean_abs_error_cublas(
 		data_raw_ptr,
 		labels_raw_ptr,
 		weights_raw_ptr,
-		loss_raw_ptr,
 		R,
 		C);
 
-	std::cout << "Average absolute loss (8.0 expected): " << avg_abs_loss << std::endl;
+	std::cout << "Mean absolute error (8.0 expected): " << avg_abs_loss << std::endl;
 }
 
 void test_permutation() {
@@ -276,4 +270,112 @@ void test_gemv() {
 	thrust_host_float loss_derivative_host(batchsize);
 	loss_derivative_host = loss_derivative;
 	print_vector(loss_derivative_host, "loss_derivative");
+}
+
+#include <stdio.h>
+#include <assert.h>
+
+// Convenience function for checking CUDA runtime API results
+// can be wrapped around any runtime API call. No-op in release builds.
+inline
+cudaError_t checkCuda(cudaError_t result)
+{
+#if defined(DEBUG) || defined(_DEBUG)
+  if (result != cudaSuccess) {
+    fprintf(stderr, "CUDA Runtime Error: %sn",
+            cudaGetErrorString(result));
+    assert(result == cudaSuccess);
+  }
+#endif
+  return result;
+}
+
+void profileCopies(float        *h_a,
+                   float        *h_b,
+                   float        *d,
+                   unsigned int  n,
+                   char         *desc)
+{
+  printf("\n%s transfers\n", desc);
+
+  unsigned int bytes = n * sizeof(float);
+
+  // events for timing
+  cudaEvent_t startEvent, stopEvent;
+
+  checkCuda( cudaEventCreate(&startEvent) );
+  checkCuda( cudaEventCreate(&stopEvent) );
+
+  checkCuda( cudaEventRecord(startEvent, 0) );
+  checkCuda( cudaMemcpy(d, h_a, bytes, cudaMemcpyHostToDevice) );
+  checkCuda( cudaEventRecord(stopEvent, 0) );
+  checkCuda( cudaEventSynchronize(stopEvent) );
+
+  float time;
+  checkCuda( cudaEventElapsedTime(&time, startEvent, stopEvent) );
+  printf("  Host to Device bandwidth (GB/s): %f\n", bytes * 1e-6 / time);
+
+  checkCuda( cudaEventRecord(startEvent, 0) );
+  checkCuda( cudaMemcpy(h_b, d, bytes, cudaMemcpyDeviceToHost) );
+  checkCuda( cudaEventRecord(stopEvent, 0) );
+  checkCuda( cudaEventSynchronize(stopEvent) );
+
+  checkCuda( cudaEventElapsedTime(&time, startEvent, stopEvent) );
+  printf("  Device to Host bandwidth (GB/s): %f\n", bytes * 1e-6 / time);
+
+  for (int i = 0; i < n; ++i) {
+    if (h_a[i] != h_b[i]) {
+      printf("*** %s transfers failed ***", desc);
+      break;
+    }
+  }
+
+  // clean up events
+  checkCuda( cudaEventDestroy(startEvent) );
+  checkCuda( cudaEventDestroy(stopEvent) );
+}
+
+void check_transfer_speed()
+{
+  unsigned int nElements = 4*1024*1024*16;
+  const unsigned int bytes = nElements * sizeof(float);
+
+  // host arrays
+  float *h_aPageable, *h_bPageable;
+  float *h_aPinned, *h_bPinned;
+
+  // device array
+  float *d_a;
+
+  // allocate and initialize
+  h_aPageable = (float*)malloc(bytes);                    // host pageable
+  h_bPageable = (float*)malloc(bytes);                    // host pageable
+  checkCuda( cudaMallocHost((void**)&h_aPinned, bytes) ); // host pinned
+  checkCuda( cudaMallocHost((void**)&h_bPinned, bytes) ); // host pinned
+  checkCuda( cudaMalloc((void**)&d_a, bytes) );           // device
+
+  for (int i = 0; i < nElements; ++i) h_aPageable[i] = i;
+  memcpy(h_aPinned, h_aPageable, bytes);
+  memset(h_bPageable, 0, bytes);
+  memset(h_bPinned, 0, bytes);
+
+  // output device info and transfer size
+  cudaDeviceProp prop;
+  checkCuda( cudaGetDeviceProperties(&prop, 0) );
+
+  printf("\nDevice: %s\n", prop.name);
+  printf("Transfer size (MB): %d\n", bytes / (1024 * 1024));
+
+  // perform copies and report bandwidth
+  profileCopies(h_aPageable, h_bPageable, d_a, nElements, "Pageable");
+  profileCopies(h_aPinned, h_bPinned, d_a, nElements, "Pinned");
+
+  printf("\n");
+
+  // cleanup
+  cudaFree(d_a);
+  cudaFreeHost(h_aPinned);
+  cudaFreeHost(h_bPinned);
+  free(h_aPageable);
+  free(h_bPageable);
 }

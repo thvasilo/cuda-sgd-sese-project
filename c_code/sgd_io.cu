@@ -30,15 +30,21 @@ void print_matrix(const thrust_host_float matrix, const std::string name, const 
 }
 
 /**
- * Reads a csv file of floats into two thrust host vectors passed by reference.
+ * Reads a csv file of floats into two thrust host vectors passed by reference. Returns true if succesful, false otherwise.
  * R should be the number of rows TODO: Do I want this? These we can also automatically figure out by ex. looking at the first line.
  * C should be the number of features available
  * The label should be the last column of the csv (i.e. C+1 with 1-indexing, C with 0-indexing)
  */
-void read_csv(std::string filename, thrust_host_float & data_h, thrust_host_float & labels_h, int R, int C)
+bool read_csv(std::string filename, thrust_host_float & data_h, thrust_host_float & labels_h, int R, int C)
 {
 	// Open file as stream
 	std::ifstream file_stream(filename);
+	if (!file_stream)
+	{
+		std::cout << "Warning: Could not open file: " << filename << std::endl;
+		file_stream.close();
+		return false;
+	}
 	std::string line;
 
 	// Get lines and split into tokens. Push resulting items into host vectors
@@ -65,7 +71,9 @@ void read_csv(std::string filename, thrust_host_float & data_h, thrust_host_floa
 	assert (labels_h.size() == R);
 	assert (data_h.size() == R*C);
 
+
 	file_stream.close();
+	return true;
 }
 
 /**

@@ -79,11 +79,10 @@ __host__ void permute_data_and_labels(
 		const int R,
 		const int C);
 
-__host__ float calculate_avg_loss_cublas(
+__host__ float calculate_mean_abs_error_cublas(
 	const float * data_array_d,
 	const float * label_vector_d,
 	const float * weights_d,
-	float * loss,
 	const int R,
 	const int C);
 
@@ -132,6 +131,19 @@ struct copy_idx_func : public thrust::unary_function<int, int>
     int mycol = idx%c;
     return newrow*c+mycol;
   }
+};
+
+// Summation functor used for the column sum operation
+struct scale_functor : public thrust::unary_function<float, float>
+{
+  float scaling_factor;
+
+  scale_functor(float _scaling_factor) : scaling_factor(_scaling_factor) {};
+
+  __host__ __device__
+  float operator()(float myC){
+	return myC/scaling_factor;
+	}
 };
 
 #endif /* SGD_THRUST_CUH_ */

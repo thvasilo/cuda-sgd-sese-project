@@ -48,6 +48,8 @@ struct CuBLASTimings {
 	float total_gradient_time = 0.0;
 };
 
+// TODO: Take the iterations to separate source file?
+
 /**
  * One iteration (epoch) of SGD using plain CUDA calls
  */
@@ -128,7 +130,7 @@ void cuda_iteration(
 		create_events_and_start(start_scale, stop_scale);
 
 		// Scale gradient sum vector
-		thrust::for_each(row_sums.begin(), row_sums.end(), _1 / (float)batchsize);
+		thrust::transform(row_sums.begin(), row_sums.end(), row_sums.begin(), scale_functor(batchsize));
 
 		measure_event(start_scale, stop_scale, gradient_scale_time, "gradient_scale_time");
 
@@ -269,7 +271,7 @@ void cublas_iteration(
 			col_sums, // col_sums will now contain the sum of the columns in the gradient matrix, scaled by 1/batchsize
 			batchsize,
 			C,
-			float(1.0)); // TODO: Should be batchsize!!
+			float(batchsize));
 		// TODO: DAFAQ: Why does it still converge (and much faster) when I don't scale by the batch size?
 		measure_event(start_col_sum, stop_col_sum, column_sum_time, "col_sum_time");
 
@@ -321,7 +323,10 @@ int main(int argc, char **argv) {
 //	test_col_sums();
 //	test_col_sum_and_scale();
 //
-//	test_abs_error();
+	test_abs_error();
+
+//	check_transfer_speed();
+
 //	return 0;
 
 	if	(argc != 8) {
@@ -348,19 +353,37 @@ int main(int argc, char **argv) {
 
 	// Initialize data vector on host
 	thrust_host_float data_h(R * C);
+	std::cout << "Data size: ~" << float(R)*C*sizeof(float)/(1024*1024) << "MB" << std::endl;
 
 	// Initialize labels vector on host
 	thrust_host_float labels_h(R);
 
+	cudaEvent_t start_csv;
+	cudaEvent_t stop_csv;
+	create_events_and_start(start_csv, stop_csv);
 	// Read data from csv file into host vectors
-	read_csv(filepath, data_h, labels_h, R, C);
+	bool read_success = read_csv(filepath, data_h, labels_h, R, C);
+	if (!read_success)
+	{
+		std::cout << "Could not read file, exiting..." << std::endl;
+		return 0;
+	}
+	float csv_time = 0.0;
+	measure_event(start_csv, stop_csv, csv_time, "read_csv_time");
+	printf("%s time = %f ms\n", "csv read", csv_time);
 
 	// Copy data from host vectors to device
 	// note: d_vec.data() returns a device_ptr
+	float copy_time = 0.0;
+	cudaEvent_t start_copy;
+	cudaEvent_t stop_copy;
+	create_events_and_start(start_copy, stop_copy);
 	thrust_dev_float data_d = data_h;
 	float * data_raw_ptr = thrust::raw_pointer_cast(data_d.data());
 	thrust_dev_float labels_d = labels_h;
 	float * labels_raw_ptr = thrust::raw_pointer_cast(labels_d.data());
+	measure_event(start_copy, stop_copy, copy_time, "gpu_copy_time");
+	printf("%s time = %f ms\n", "GPU copy", copy_time);
 
 	// Initialize weights
 	thrust_dev_float weights(C);
@@ -409,7 +432,7 @@ int main(int argc, char **argv) {
 	thrust_dev_float row_sums(C);
 	thrust_dev_int row_indices(C);
 
-	// Record the data transfer time
+	// Record the complete data transfer time (read+transfer)
 	cudaEventRecord(stop_memory);
 	cudaEventSynchronize(stop_memory);
 	float transfer_time = 0;
@@ -479,21 +502,6 @@ int main(int argc, char **argv) {
 
 	}
 
-	// TODO: Fix error calculation so that it works again, and calcs avg. error, not sum.
-	// Print final weights and squared error sum
-	// Calculate the squared error for each data point
-//	squared_errors<<<iDivUp(R, THREADS_PER_BLOCK), THREADS_PER_BLOCK>>>(
-//			data_raw_ptr,
-//			labels_raw_ptr,
-//			weights_raw_ptr,
-//			errors_raw_ptr,
-//			R,
-//			C);
-
-	// Print final quantities
-//	float sq_err_sum = thrust::reduce(errors.begin(), errors.end());
-//	std::cout << "Squared error sum: " << sq_err_sum << std::endl;
-
 	// Get the total GPU time
 	cudaEventRecord(stop);
 	cudaEventSynchronize(stop);
@@ -509,6 +517,13 @@ int main(int argc, char **argv) {
 	printf("Data transfer time = %f ms\n", transfer_time);
 	printf("GPU time = %f ms\n", gpu_time);
 
+	float avg_abs_error = calculate_mean_abs_error_cublas(
+				data_raw_ptr,
+				labels_raw_ptr,
+				weights_raw_ptr,
+				R,
+				C);
+
 	// Write timings to JSON file
 	ExperimentOutput exp;
 	std::string filename = get_filename_from_path(filepath);
@@ -521,7 +536,7 @@ int main(int argc, char **argv) {
 		printf("Col sum/scale time = %f ms\n", cublasTimings->column_sum_time);
 		printf("saxpy time = %f ms\n", cublasTimings->saxpy_time);
 
-		exp = ExperimentOutput(cublasTimings->shuffle_time, cublasTimings->total_gradient_time, gpu_time, transfer_time);
+		exp = ExperimentOutput(cublasTimings->shuffle_time, cublasTimings->total_gradient_time, gpu_time, transfer_time, avg_abs_error);
 		write_experiment_output(exp, filename + "-cublas.json");
 	} else {
 		printf("Total gradient time = %f ms\n", cudaTimings->total_gradient_time);
@@ -532,26 +547,14 @@ int main(int argc, char **argv) {
 		printf("row sum time = %f ms\n", cudaTimings->row_sum_time);
 		printf("saxpy time = %f ms\n", cudaTimings->saxpy_time);
 
-		exp = ExperimentOutput(cudaTimings->shuffle_time, cudaTimings->total_gradient_time, gpu_time, transfer_time);
+		exp = ExperimentOutput(cudaTimings->shuffle_time, cudaTimings->total_gradient_time, gpu_time, transfer_time, avg_abs_error);
 
 		write_experiment_output(exp, filename + "-cuda.json");
 	}
 
 	print_vector(weights, "weights");
 
-	// Initialize loss derivative vector
-	thrust_dev_float loss_vector(R);
-	float * loss_raw_ptr = thrust::raw_pointer_cast(loss_vector.data());
-
-	float avg_abs_loss = calculate_avg_loss_cublas(
-			data_raw_ptr,
-			labels_raw_ptr,
-			weights_raw_ptr,
-			loss_raw_ptr,
-			R,
-			C);
-
-	std::cout << "Average absolute loss : " << avg_abs_loss << std::endl;
+	std::cout << "Mean absolute error : " << avg_abs_error << std::endl;
 
 	// Cleanup
 	cudaEventDestroy(start);

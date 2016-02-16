@@ -67,26 +67,28 @@ __global__ void squared_errors(
 }
 
 /**
- * Calculates the average absolute loss using cuBLAS calls
+ * Calculates the mean absolute error using cuBLAS calls
  */
-__host__ float calculate_avg_loss_cublas(
+__host__ float calculate_mean_abs_error_cublas(
 	const float * data_array_d,
 	const float * label_vector_d,
 	const float * weights_d,
-	float * loss,
 	const int R,
 	const int C) {
 	// Set up cuBLAS environment
 	cublasHandle_t cnpHandle;
 	cublasStatus_t status = cublasCreate(&cnpHandle);
+	// Initialize error vector
+	thrust_dev_float error_vector(R);
+	float * error = thrust::raw_pointer_cast(error_vector.data());
 
-	// We copy the labels into the loss derivative vector, since the gemv operation below is destructive for
+	// We copy the labels into the error vector, since the gemv operation below is destructive for
 	// the destination vector
 	cublasScopy(
 			cnpHandle,
 			R,
 			label_vector_d, 1,
-			loss, 1);
+			error, 1);
 
 	const float alpha = 1.0;
 	const float a_minus = -1.0;
@@ -105,18 +107,18 @@ __host__ float calculate_avg_loss_cublas(
 		weights_d,
 		1,
 		&a_minus,
-		loss, // The result of the calculation is stored in the loss derivative vector
+		error, // The result of the calculation is stored in the error vector
 		1);
 	// Check if the gemv operation was successful
 	if (status != CUBLAS_STATUS_SUCCESS) {
-		    std::cerr << "WARNING: Failed to execute the gemv in calculate_avg_loss_cublas!\n";
+		    std::cerr << "WARNING: Failed to execute the gemv in calculate_mean_abs_error_cublas!\n";
 	}
 
 	float error_sum = 0.0;
-
-	status = cublasSasum_v2(cnpHandle, R, loss, 1, &error_sum);
+	// Compute the sum of the absolute values of the error
+	status = cublasSasum_v2(cnpHandle, R, error, 1, &error_sum);
 	if (status != CUBLAS_STATUS_SUCCESS) {
-			    std::cerr << "WARNING: Failed to execute the asum in calculate_avg_loss_cublas!\n";
+			    std::cerr << "WARNING: Failed to execute the asum in calculate_mean_abs_error_cublas!\n";
 	}
 
 	// Clean up cuBLAS environment

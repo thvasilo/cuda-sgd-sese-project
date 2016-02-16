@@ -20,7 +20,7 @@ all:  $(OBJECTS)
 
 %.o: %.cu
 	$(NVCC) $(NVCCFLAGS) $(INC) -x cu -I. -dc $< -o $@
-	
+
 %.o: %.cpp
 	$(NVCC) $(NVCCFLAGS) $(INC) -x cu -I. -dc $< -o $@
 

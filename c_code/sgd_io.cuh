@@ -28,21 +28,23 @@
 class ExperimentOutput {
 
 private:
-	float shuffle_time, total_gradient_time, gpu_time, transfer_time;
+	float shuffle_time, total_gradient_time, gpu_time, transfer_time, error;
 
 public:
 	ExperimentOutput():
 		shuffle_time(0.0),
 		total_gradient_time(0.0),
 		gpu_time(0.0),
-		transfer_time(0.0) {}
+		transfer_time(0.0),
+		error(0.0) {}
 
 
-	ExperimentOutput(float _shuffle_time, float  _total_gradient_time, float  _gpu_time, float  _transfer_time):
+	ExperimentOutput(float _shuffle_time, float  _total_gradient_time, float  _gpu_time, float  _transfer_time, float _error):
 		shuffle_time(_shuffle_time),
 		total_gradient_time(_total_gradient_time),
 		gpu_time(_gpu_time),
-		transfer_time(_transfer_time) {}
+		transfer_time(_transfer_time),
+		error(_error) {}
 
 	Json::Value toJsonObject() const {
 		Json::Value jsonObj;
@@ -51,6 +53,7 @@ public:
 		jsonObj["total_gradient_time"] = this->total_gradient_time;
 		jsonObj["gpu_time"] = this->gpu_time;
 		jsonObj["transfer_time"] = this->transfer_time;
+		jsonObj["error"] = this->error;
 
 		return jsonObj;
 	}
@@ -85,7 +88,6 @@ std::string get_filename_from_path(std::string filepath);
  * C should be the number of features available
  * The label should be the last column of the csv (i.e. C+1 with 1-indexing, C with 0-indexing)
  */
-void read_csv(std::string filename, thrust_host_float & data_h, thrust_host_float & labels_h, int R, int C);
-
+bool read_csv(std::string filename, thrust_host_float & data_h, thrust_host_float & labels_h, int R, int C);
 
 #endif /* SGD_IO_CUH_ */

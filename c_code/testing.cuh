@@ -20,4 +20,6 @@ void test_gemv();
 
 void test_abs_error();
 
+void check_transfer_speed();
+
 #endif /* TESTING_CUH_ */
