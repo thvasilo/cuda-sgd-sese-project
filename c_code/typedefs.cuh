@@ -33,4 +33,6 @@ typedef thrust::device_vector<int> thrust_dev_int;
 	cudaEventRecord(start_event); \
 }
 
+// #define LVL1 // Used to control whether to perform dynamic parallelism calls in the plain CUDA codepath.
+
 #endif /* TYPEDEFS_CUH_ */

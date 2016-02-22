@@ -448,6 +448,11 @@ int main(int argc, char **argv) {
 	CuBLASTimings* cublasTimings = new CuBLASTimings();
 	CudaTimings* cudaTimings = new CudaTimings();
 
+    if(cudaRun) {
+        #ifdef LVL1
+        std::cout << "NOTE: Using cuBLAS dynamic parallelism!" << std::endl;
+        #endif
+    }
 	for (int epoch = 1; epoch <= MAX_EPOCHS; ++epoch) {
 
 		if (!cudaRun) {
@@ -552,7 +557,7 @@ int main(int argc, char **argv) {
 		write_experiment_output(exp, filename + "-cuda.json");
 	}
 
-	print_vector(weights, "weights");
+	// print_vector(weights, "weights");
 
 	std::cout << "Mean absolute error : " << avg_abs_error << std::endl;
 

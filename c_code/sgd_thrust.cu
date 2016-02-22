@@ -8,6 +8,7 @@
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/copy.h>
 
+
 /**
  * Returns the squared loss derivative
  * The way this works is: We provide pointers to items inside the data and label vectors,
@@ -20,6 +21,11 @@ __device__ float squared_loss_derivative(
 	const float * label_vector_d,
 	const float * weights_d,
 	const int C) {
+
+	// Calculate prediction
+	float prediction = 0.0;
+	// TODO: Guard against accesses that go outside the data_array_d limits
+	#ifdef LVL1
 	cublasHandle_t cublasHandle;
 	cublasStatus_t status = cublasCreate(&cublasHandle);
 
@@ -27,19 +33,20 @@ __device__ float squared_loss_derivative(
 	{
 		printf("Something went wrong with cuBLAS initialization in squared_loss_derivative\n");
 	}
-
-	// Calculate prediction
-	float prediction = 0.0;
-	float * pred_p = &prediction;
-	// TODO: Guard against accesses that go outside the data_array_d limits
-	cublasSdot(cublasHandle, C, data_array_d, 1, weights_d, 1, pred_p);
-//	for (int i = 0; i < C; ++i) {
-//		prediction += data_array_d[i] * weights_d[i];
-//	}
+	status = cublasSdot(cublasHandle, C, data_array_d, 1, weights_d, 1, &prediction);
+	if (status != CUBLAS_STATUS_SUCCESS)
+	{
+		printf("Something went wrong with the cuBLAS dot product in squared_loss_derivative\n");
+	}
+	cublasDestroy(cublasHandle);
+	#else
+	for (int i = 0; i < C; ++i) {
+		prediction += data_array_d[i] * weights_d[i];
+	}
+	#endif
 	// For squared loss the loss derivative is equal to the simple loss: (y_hat - y_true)
 	float loss_derivative = prediction - *label_vector_d;
 
-	cublasDestroy(cublasHandle);
 	return loss_derivative;
 }
 
@@ -141,13 +148,6 @@ __global__ void calculate_gradients(
 	// TODO: R, C should be device constants
 	// Each data point should get one thread
 	// We want each thread to take one "row" of the matrix and only modify that.
-//	cublasHandle_t cnpHandle;
-//	cublasStatus_t status = cublasCreate(&cnpHandle);
-//
-//	if (status != CUBLAS_STATUS_SUCCESS)
-//	{
-//		printf("Something went wrong with cuBLAS initialization in calculate_gradients\n");
-//	}
 
 	int thread_index = blockIdx.x * blockDim.x + threadIdx.x; // Should be row index
 
@@ -167,13 +167,29 @@ __global__ void calculate_gradients(
 				weights_d,
 				C);
 		// Scale the gradient by the loss_derivative
+		#ifdef LVL1
+		cublasHandle_t cnpHandle;
+		cublasStatus_t status = cublasCreate(&cnpHandle);
+		if (status != CUBLAS_STATUS_SUCCESS)
+		{
+			printf("Something went wrong with cuBLAS initialization in calculate_gradients\n");
+		}
+		// Scale by using cuBLAS saxpy
+		status = cublasSaxpy(
+			cnpHandle, C, &loss_derivative, &data_array_d[linear_index], 1, &gradients_d[thread_index], R);
+		if (status != CUBLAS_STATUS_SUCCESS)
+		{
+			printf("Something went wrong with axpy in calculate_gradients\n");
+		}
+		cublasDestroy(cnpHandle);
+		#else
+		// Scale using a simple for loop
 		for (int i = 0; i < C; ++i) {
 			// For linear models the gradient equals the features
 			gradients_d[i*R + thread_index] = loss_derivative * data_array_d[linear_index + i];
 		}
+		#endif
 	}
-
-//	cublasDestroy(cnpHandle);
 }
 
 /**
