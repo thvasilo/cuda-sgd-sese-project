@@ -22,7 +22,7 @@ if __name__ == '__main__':
     Ex. usage: > python comparison_plot.py -m gpu_time -o gpu_comp --folderA folderA --folderB folderB \
      --title "GPU time comparison" --xlabel "Num. samples" --ylabel "GPU Time (ms)" --Aname "PooBLAS" --Bname "CUBLAS"
     """
-
+    # TODO: Enable support for arbitrary number of folders/comparisons
     import argparse
     parser = argparse.ArgumentParser(description="Script for plotting comparisons between SGD implementations")
     parser.add_argument("-m", "--measure", help="The measure we are interested in plotting. Ex. \"gpu_time\" ")
@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     def list_files(path):
         """
-        Create a list containing only the files present under the provided directory path
+        Create a list containing only the files (not directories) present under the provided directory path
         :param path: The directory under which we search for files
         :return: A list containing all the filepaths under the provided directory
         """
@@ -57,7 +57,7 @@ if __name__ == '__main__':
     def extract_parameter_range(file_list):
         """
         Returns a list containing the range of parameters present in the list of files/
-        We are assuming that the file have a naming scheme of <some-name>-<parameter-setting>-output.json
+        We are assuming that the files have a naming scheme of <some-name>-<parameter-setting>-<codepath>.json
         :param file_list: A list containing filenames with the above format
         :return: A sorted list of a range of parameters
         """
@@ -98,9 +98,10 @@ if __name__ == '__main__':
     # Plotting
 
     # Plotting Configuration
-    if not os.path.exists("plots"):
-        os.makedirs("plots")
-    folder = './plots/'
+    dir_name = "comparison-plots"
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+    folder = "./{}/".format(dir_name)
     plt_filepath = folder + args.output + ".pdf"
     frameon = False  # no background
     transparent = True
