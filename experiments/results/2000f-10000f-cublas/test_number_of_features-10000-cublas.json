@@ -1,0 +1,7 @@
+{
+   "error" : 1689.43994140625,
+   "gpu_time" : 850.52001953125,
+   "shuffle_time" : 5328.818359375,
+   "total_gradient_time" : 1726.671142578125,
+   "transfer_time" : 26752.703125
+}
