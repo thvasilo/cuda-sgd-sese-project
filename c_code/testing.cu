@@ -10,6 +10,8 @@
 
 using namespace thrust::placeholders;
 
+// TODO: Automate testing
+
 void test_abs_error() {
 	const int R = 5;
 	const int C = 4;
@@ -20,7 +22,7 @@ void test_abs_error() {
 	// Initialize labels vector on host
 	thrust_host_float labels_h(R);
 
-	std::string filename = "data/gemv_test";
+	std::string filename = "test-data/gemv_test";
 	// Read data from csv file into host vectors
 	read_csv(filename, data_h, labels_h, R, C);
 
@@ -62,7 +64,7 @@ void test_permutation() {
 	// Initialize labels vector on host
 	thrust_host_float labels_h(R);
 
-	std::string filename = "data/permutation_test.csv";
+	std::string filename = "test-data/permutation_test.csv";
 	// Read data from csv file into host vectors
 	read_csv(filename, data_h, labels_h, R, C);
 
@@ -112,7 +114,7 @@ void test_col_sums() {
 	// Initialize labels vector on host
 	thrust_host_float labels(R);
 
-	std::string filename = "data/col_sum_test.csv";
+	std::string filename = "test-data/col_sum_test.csv";
 	// Read data from csv file into host vectors
 	read_csv(filename, data_h, labels, R, C);
 
@@ -146,7 +148,7 @@ void test_col_sum_and_scale() {
 	// Initialize labels vector on host
 	thrust_host_float labels(R);
 
-	std::string filename = "data/col_sum_test.csv";
+	std::string filename = "test-data/col_sum_test.csv";
 	// Read data from csv file into host vectors
 	read_csv(filename, data_h, labels, R, C);
 
@@ -195,7 +197,7 @@ void test_matrix_scale() {
 	// Initialize labels vector on host
 	thrust_host_float scaling_vector(R);
 
-	std::string filename = "data/matrix_scale_test";
+	std::string filename = "test-data/matrix_scale_test";
 	// Read data from csv file into host vectors
 	read_csv(filename, data_h, scaling_vector, R, C);
 
@@ -232,7 +234,7 @@ void test_gemv() {
 	// Initialize labels vector on host
 	thrust_host_float labels_h(R);
 
-	std::string filename = "data/gemv_test";
+	std::string filename = "test-data/gemv_test";
 	// Read data from csv file into host vectors
 	read_csv(filename, data_h, labels_h, R, C);
 
@@ -271,6 +273,8 @@ void test_gemv() {
 	loss_derivative_host = loss_derivative;
 	print_vector(loss_derivative_host, "loss_derivative");
 }
+
+// The following taken from https://devblogs.nvidia.com/parallelforall/how-optimize-data-transfers-cuda-cc/
 
 #include <stdio.h>
 #include <assert.h>

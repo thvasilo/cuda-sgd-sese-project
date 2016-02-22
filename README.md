@@ -24,12 +24,12 @@ The reason I call this a bad implementation is because currently, it uses the si
 That means that that if you run an experiment with batch size of 10, you will only get 10 threads running on the GPU
 which is horrible. So if you want any kind of performance here you have to use large batch sizes (at least 1000).
 I do plan to change the implementation to be able to run multiple batches in parallel and then it will
-become an "OK" implementation.  
+become an "OK" implementation.
 Still, since I couldn't find any other approachable/intuitive implementations of SGD in CUDA out there, I thought this might
 prove useful to some people, despite this obvious design problem.
 
-I'm also including the results (with plots) of various experiments I ran, as well as the report for the SeSE course, which uses
-some parts (intro and related work) of the report we co-wrote with Ramón Heberto Martínez Mayorquin for the PDC
+I'm also including the results (with plots) of various experiments I ran, as well as the report for the second course, which uses
+some parts (intro and related work) from the report we co-wrote with Ramón Heberto Martínez Mayorquin for the PDC
 summer school. Ramón also wrote the original versions of the Python scripts used to automate our experiments.
 
 Improvements I would like to make:
@@ -39,6 +39,9 @@ Improvements I would like to make:
   permuted copy of the original data (shuffle) before each iteration, I maintain both a copy of the original data and
   a permuted copy. So for a 1GB dataset, I use 2GB memory which is unnecessary. I should be doing the shuffle in-place
   instead.
+* Automate tests. The functions I have in the testing.cu* files currently only print out results, I need
+  to use a proper testing platform and automate these.
 
 Acknowledgements: I would like to thank [Robert Crovella](http://stackoverflow.com/users/1695960/robert-crovella)
 for all the help he has provided on Stackoverflow, you will find a couple of his SO replies in this implementation.
+I am using the [JSONCpp](https://github.com/open-source-parsers/jsoncpp) library to write out JSON files for the experiments.
