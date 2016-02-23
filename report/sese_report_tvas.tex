@@ -571,7 +571,9 @@ Also, as we mentioned in Section \ref{sec:improvement}, for a small number of fe
 4 used in this experiments we don't expect any improvement as there is very little to do in parallel.
 We investigate what happens when many features are used in the following experiments.
 
-\subsubsection*{Scaling in terms of number of samples}
+\pagebreak
+
+\subsubsection*{Scaling in terms of number of features}
 
 For larger number of features, the difference becomes less pronounced, but remains largely similar
 as before.
@@ -587,6 +589,8 @@ as before.
 With this in mind, we cannot claim that the performance degradation comes from a lack of parallelism
 potential. The last potential cause we wanted to investigate was having a lack of parallelism
 per block, which we do next.
+
+\pagebreak
 
 \subsubsection*{Scaling in terms of number of batch size}
 
@@ -620,7 +624,7 @@ we used in the previous experiments.
 
 \subsubsection*{Scaling in terms of number of samples}
 
-We take a look at the scaling in term of samples first. Our expectation is that there shouldn't be a large difference
+We take a look at the scaling in terms of number of samples first. Our expectation is that there shouldn't be a large difference
 between the two, because given the very small number of features (4), there is not a lot of room
 for the Level 2 routine to operate.
 
@@ -640,7 +644,7 @@ We investigate what happens when large numbers of features are used in the follo
 
 \pagebreak
 
-\subsubsection*{Scaling in terms of number of samples}
+\subsubsection*{Scaling in terms of number of features}
 
 For larger number of features, there should be enough level of parallelism so that
 the optimized Level 2 routines can make up for the overhead introduced by the shuffling.
