@@ -8,8 +8,10 @@ import re
 
 def sorted_nicely(l):
     """ Sort the given iterable in the way that humans expect."""
-    convert = lambda text: int(text) if text.isdigit() else text
-    alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
+    def convert(text): int(text) if text.isdigit() else text
+
+    def alphanum_key(key): [convert(c) for c in re.split('([0-9]+)', key)]
+
     return sorted(l, key=alphanum_key)
 
 if __name__ == '__main__':
@@ -19,8 +21,8 @@ if __name__ == '__main__':
     We are assuming that the JSON files differ in one dimension as represented
     in their filename, and that both folders share the same generating procedure
     (i.e the filenames under both folders should be the same)
-    Ex. usage: > python comparison_plot.py -m gpu_time -o gpu_comp --folderA folderA --folderB folderB \
-     --title "GPU time comparison" --xlabel "Num. samples" --ylabel "GPU Time (ms)" --Aname "PooBLAS" --Bname "CUBLAS"
+    Ex. usage: > comparison_plot.py -m gpu_time -o V1_vs_V2 --folderA ./results/V1/ --folderB ./results/V2/ \
+     --title "V1/V2 - Features scaling" --xlabel "Number of features" --ylabel "GPU Time (ms)" --Aname "V1" --Bname "V2"
     """
     # TODO: Enable support for arbitrary number of folders/comparisons
     import argparse
